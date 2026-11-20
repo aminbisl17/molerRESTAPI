@@ -48,6 +48,15 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             FilterChain filterChain
     ) throws ServletException, IOException {
 
+        String path = request.getServletPath();
+
+    // Skip company authentication routes.
+    // CompanyAuthController validates COMPANY_ACCESS tokens.
+    if (path.startsWith("/auth/company/")) {
+        filterChain.doFilter(request, response);
+        return;
+    }
+
         // Skip WebSocket requests
         if (request.getRequestURI().startsWith("/ws")) {
             filterChain.doFilter(request, response);
