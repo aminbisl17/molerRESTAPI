@@ -20,6 +20,10 @@ public interface PuntoriRepository extends JpaRepository<puntori, Long> {
 
     boolean existsByNumriTelefonit(String numriTelefonit);
 
+    boolean existsByUsernameAndIdNot(String username, Long id);
+
+boolean existsByEmailAndIdNot(String email, Long id);
+
     Optional<puntori> findByEmail(String email);
 
     List<puntori> findByStatusi(String statusi);

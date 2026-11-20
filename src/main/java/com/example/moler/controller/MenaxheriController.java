@@ -1,4 +1,4 @@
-package com.example.moler.controller.MenaxheriController;
+package com.example.moler.controller;
 
 import com.example.moler.dto.MenaxheriDTO.MenaxheriResponseDTO;
 import com.example.moler.authentication.JwtUtil;

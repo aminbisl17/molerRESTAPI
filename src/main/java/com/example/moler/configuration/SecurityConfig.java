@@ -134,7 +134,8 @@ public class SecurityConfig {
                 // PUBLIC ENDPOINTS
                 .requestMatchers(
                         "/menaxheri/register",
-                        "/auth/**"
+                        "/auth/**",
+                        "/puntori/login"
                 ).permitAll()
 
                 // MENAXHER ENDPOINTS
