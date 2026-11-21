@@ -6,7 +6,9 @@ import com.example.moler.dto.CompanyDTO.CompanyLoginDTO;
 import com.example.moler.dto.CompanyDTO.RegisterCompanyDTO;
 import com.example.moler.dto.CompanyDTO.VerifyCompanyCodeDTO;
 import com.example.moler.model.menaxheri;
+import com.example.moler.model.puntori;
 import com.example.moler.repository.MenaxheriRepository;
+import com.example.moler.repository.PuntoriRepository;
 
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -36,23 +38,116 @@ public class AuthController {
     private final JwtUtil jwtUtil;
    private final SecureRandom secureRandom = new SecureRandom();
     private final JdbcTemplate jdbcTemplate;
+    private final PuntoriRepository puntoriRepository;
 
     @Autowired
-    private BCryptPasswordEncoder passwordEncoder
-    ;
+    private BCryptPasswordEncoder passwordEncoder;
+
     public AuthController(
-            MenaxheriRepository menaxheriRepository,
-            @org.springframework.beans.factory.annotation.Qualifier("menaxheriAuthManager")
-            AuthenticationManager menaxheriAuthManager,
-            JwtUtil jwtUtil,
-            JdbcTemplate jdbcTemplate
-    ) {
-        this.menaxheriRepository = menaxheriRepository;
-        this.menaxheriAuthManager = menaxheriAuthManager;
-        this.jwtUtil = jwtUtil;
-        this.jdbcTemplate = jdbcTemplate;
+        MenaxheriRepository menaxheriRepository,
+        PuntoriRepository puntoriRepository,
+        @org.springframework.beans.factory.annotation.Qualifier("menaxheriAuthManager")
+        AuthenticationManager menaxheriAuthManager,
+        JwtUtil jwtUtil,
+        JdbcTemplate jdbcTemplate
+) {
+    this.menaxheriRepository = menaxheriRepository;
+    this.puntoriRepository = puntoriRepository;
+    this.menaxheriAuthManager = menaxheriAuthManager;
+    this.jwtUtil = jwtUtil;
+    this.jdbcTemplate = jdbcTemplate;
+}
+
+@PostMapping("/refresh")
+public ResponseEntity<?> refresh(
+        @RequestBody Map<String, String> request
+) {
+
+    String refreshToken = request.get("refreshToken");
+
+    if (refreshToken == null || refreshToken.isBlank()
+            || !jwtUtil.validateRefreshToken(refreshToken)) {
+
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(Map.of("message", "Invalid refresh token"));
     }
 
+    String role = jwtUtil.extractRole(refreshToken);
+
+    if (!"ROLE_MENAXHER".equals(role)
+            && !"ROLE_PUNTOR".equals(role)) {
+
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("message", "Invalid refresh token role"));
+    }
+
+    Long tenantId = jwtUtil.extractTenantId(refreshToken);
+
+    if (tenantId == null || !tenantId.equals(TenantContext.getTenantId())) {
+
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("message", "Tenant mismatch"));
+    }
+
+    Long id = jwtUtil.extractId(refreshToken);
+    String username = jwtUtil.extractUsername(refreshToken);
+
+    // MANAGER
+    if ("ROLE_MENAXHER".equals(role)) {
+
+        menaxheri menaxheri = menaxheriRepository.findById(id)
+                .orElse(null);
+
+        if (menaxheri == null
+                || !menaxheri.getUsername().equals(username)) {
+
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("message", "Manager not found"));
+        }
+    }
+
+    // EMPLOYEE
+    if ("ROLE_PUNTOR".equals(role)) {
+
+        puntori puntori = puntoriRepository.findById(id)
+                .orElse(null);
+
+        if (puntori == null
+                || !puntori.getUsername().equals(username)) {
+
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("message", "Employee not found"));
+        }
+
+        if (puntori.getStatusi() == null
+                || !"a".equalsIgnoreCase(puntori.getStatusi().trim())) {
+
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("message", "Employee account is inactive"));
+        }
+    }
+
+    String newAccessToken = jwtUtil.generateToken(
+            id,
+            username,
+            role,
+            tenantId
+    );
+
+    String newRefreshToken = jwtUtil.generateRefreshToken(
+            id,
+            username,
+            role,
+            tenantId
+    );
+
+    return ResponseEntity.ok(
+            new TokenResponseDTO(
+                    newAccessToken,
+                    newRefreshToken
+            )
+    );
+}
     // 1. LOGIN
     @PostMapping("/menaxheri/login")
     public ResponseEntity<?> login(@RequestBody LoginDTO dto) {
@@ -92,74 +187,6 @@ public class AuthController {
         }
     }
 
-
-@PostMapping("/menaxheri/refresh")
-public ResponseEntity<?> refresh(
-        @CookieValue(name = "MenaxherirefreshToken", required = false)
-        String refreshToken
-) {
-
-    if (refreshToken == null || !jwtUtil.validateRefreshToken(refreshToken)) {
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(Map.of("message", "Invalid refresh token"));
-    }
-
-    if (!"ROLE_MENAXHER".equals(jwtUtil.extractRole(refreshToken))) {
-        return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(Map.of("message", "Manager refresh token required"));
-    }
-
-    Long tenantId = jwtUtil.extractTenantId(refreshToken);
-
-    if (tenantId == null || !tenantId.equals(TenantContext.getTenantId())) {
-        return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(Map.of("message", "Tenant mismatch"));
-    }
-
-    Long id = jwtUtil.extractId(refreshToken);
-    String username = jwtUtil.extractUsername(refreshToken);
-
-    menaxheri menaxheri = menaxheriRepository.findById(id)
-            .orElse(null);
-
-    if (menaxheri == null ||
-            !menaxheri.getUsername().equals(username)) {
-
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(Map.of("message", "Manager not found"));
-    }
-
-    String newAccessToken = jwtUtil.generateToken(
-            id,
-            username,
-            "ROLE_MENAXHER",
-            tenantId
-    );
-
-    String newRefreshToken = jwtUtil.generateRefreshToken(
-            id,
-            username,
-            "ROLE_MENAXHER",
-            tenantId
-    );
-
-    ResponseCookie cookie = ResponseCookie.from(
-                    "MenaxheriRefreshToken",
-                    newRefreshToken
-            )
-            .httpOnly(true)
-            .secure(true)
-            .path("/")
-            .maxAge(7 * 24 * 60 * 60)
-            .sameSite("None")
-            .build();
-
-    return ResponseEntity.ok()
-            .header("Set-Cookie", cookie.toString())
-            .body(Map.of("accessToken", newAccessToken));
-}
-
-    // 3. LOGOUT / DELETE REFRESH TOKEN
     // 3. LOGOUT / DELETE REFRESH TOKEN
 @PostMapping("/menaxheri/logout")
 public ResponseEntity<?> logout(HttpServletResponse response) {
