@@ -107,7 +107,7 @@ public ResponseEntity<?> login(
 // REFRESH ACCESS TOKEN
 @PostMapping("/refresh")
 public ResponseEntity<?> refresh(
-        @CookieValue(name = "PuntoriRefreshToken", required = false)
+        @CookieValue(name = "refreshToken", required = false)
         String refreshToken
 ) {
 

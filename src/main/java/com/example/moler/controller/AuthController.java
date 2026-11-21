@@ -92,45 +92,72 @@ public class AuthController {
         }
     }
 
-    // 2. REFRESH ACCESS TOKEN
-    @PostMapping("/menaxheri/refresh")
-    public ResponseEntity<?> refresh(@RequestBody Map<String, String> request) {
 
-        String refreshToken = request.get("MenaxheriRefreshToken");
+@PostMapping("/menaxheri/refresh")
+public ResponseEntity<?> refresh(
+        @CookieValue(name = "MenaxherirefreshToken", required = false)
+        String refreshToken
+) {
 
-        if (refreshToken == null || !jwtUtil.validateRefreshToken(refreshToken)) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("message", "Invalid refresh token"));
-        }
-
-        Long tenantId = jwtUtil.extractTenantId(refreshToken);
-
-        if (!tenantId.equals(TenantContext.getTenantId())) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(Map.of("message", "Tenant mismatch"));
-        }
-
-        Long id = jwtUtil.extractId(refreshToken);
-        String username = jwtUtil.extractUsername(refreshToken);
-        String role = jwtUtil.extractRole(refreshToken);
-
-        if (!menaxheriRepository.existsByUsername(username)) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("message", "Menaxheri not found"));
-        }
-
-        String newAccessToken = jwtUtil.generateToken(
-                id, username, role, tenantId
-        );
-
-        String newRefreshToken = jwtUtil.generateRefreshToken(
-                id, username, role, tenantId
-        );
-
-        return ResponseEntity.ok(
-                new TokenResponseDTO(newAccessToken, newRefreshToken)
-        );
+    if (refreshToken == null || !jwtUtil.validateRefreshToken(refreshToken)) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(Map.of("message", "Invalid refresh token"));
     }
+
+    if (!"ROLE_MENAXHER".equals(jwtUtil.extractRole(refreshToken))) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("message", "Manager refresh token required"));
+    }
+
+    Long tenantId = jwtUtil.extractTenantId(refreshToken);
+
+    if (tenantId == null || !tenantId.equals(TenantContext.getTenantId())) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("message", "Tenant mismatch"));
+    }
+
+    Long id = jwtUtil.extractId(refreshToken);
+    String username = jwtUtil.extractUsername(refreshToken);
+
+    menaxheri menaxheri = menaxheriRepository.findById(id)
+            .orElse(null);
+
+    if (menaxheri == null ||
+            !menaxheri.getUsername().equals(username)) {
+
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(Map.of("message", "Manager not found"));
+    }
+
+    String newAccessToken = jwtUtil.generateToken(
+            id,
+            username,
+            "ROLE_MENAXHER",
+            tenantId
+    );
+
+    String newRefreshToken = jwtUtil.generateRefreshToken(
+            id,
+            username,
+            "ROLE_MENAXHER",
+            tenantId
+    );
+
+    ResponseCookie cookie = ResponseCookie.from(
+                    "MenaxheriRefreshToken",
+                    newRefreshToken
+            )
+            .httpOnly(true)
+            .secure(true)
+            .path("/")
+            .maxAge(7 * 24 * 60 * 60)
+            .sameSite("None")
+            .build();
+
+    return ResponseEntity.ok()
+            .header("Set-Cookie", cookie.toString())
+            .body(Map.of("accessToken", newAccessToken));
+}
 
     // 3. LOGOUT / DELETE REFRESH TOKEN
     // 3. LOGOUT / DELETE REFRESH TOKEN
