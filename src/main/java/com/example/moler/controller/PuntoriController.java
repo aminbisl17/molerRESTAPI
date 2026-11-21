@@ -36,8 +36,7 @@ public class PuntoriController {
         this.jwtUtil = jwtUtil;
     }
 
- // EMPLOYEE LOGIN
-@PostMapping("/login")
+    @PostMapping("/login")
 public ResponseEntity<?> login(
         @RequestBody LoginDTO dto,
         HttpServletResponse response
@@ -65,7 +64,7 @@ public ResponseEntity<?> login(
 
     if (statusi == null || !"a".equalsIgnoreCase(statusi.trim())) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(Map.of("message", "Your employee account is inactive"));
+                .body(Map.of("message", "Your account is inactive"));
     }
 
     Long tenantId = TenantContext.getTenantId();
@@ -84,7 +83,10 @@ public ResponseEntity<?> login(
             tenantId
     );
 
-    ResponseCookie cookie = ResponseCookie.from("PuntoriRefreshToken", refreshToken)
+    ResponseCookie cookie = ResponseCookie.from(
+                    "PuntoriRefreshToken",
+                    refreshToken
+            )
             .httpOnly(true)
             .secure(true)
             .path("/")
@@ -95,7 +97,10 @@ public ResponseEntity<?> login(
     response.addHeader("Set-Cookie", cookie.toString());
 
     return ResponseEntity.ok(
-            Map.of("accessToken", accessToken)
+            Map.of(
+                    "accessToken", accessToken,
+                    "refreshToken", refreshToken
+            )
     );
 }
 
