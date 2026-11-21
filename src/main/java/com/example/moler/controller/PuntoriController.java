@@ -8,7 +8,10 @@ import com.example.moler.dto.PuntoriDTO.UpdatePuntoriDTO;
 import com.example.moler.model.puntori;
 import com.example.moler.repository.PuntoriRepository;
 
+import jakarta.servlet.http.HttpServletResponse;
+
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
@@ -33,59 +36,139 @@ public class PuntoriController {
         this.jwtUtil = jwtUtil;
     }
 
-    // EMPLOYEE LOGIN
-    @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody LoginDTO dto) {
+ // EMPLOYEE LOGIN
+@PostMapping("/login")
+public ResponseEntity<?> login(
+        @RequestBody LoginDTO dto,
+        HttpServletResponse response
+) {
 
-        if (dto.username() == null || dto.username().isBlank()
-                || dto.password() == null || dto.password().isBlank()) {
+    if (dto.username() == null || dto.username().isBlank()
+            || dto.password() == null || dto.password().isBlank()) {
 
-            return ResponseEntity.badRequest()
-                    .body(Map.of("message", "Username and password are required"));
-        }
-
-        puntori puntori = puntoriRepository
-                .findByUsername(dto.username().trim())
-                .orElse(null);
-
-        if (puntori == null ||
-                !passwordEncoder.matches(dto.password(), puntori.getPassword())) {
-
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("message", "Invalid username or password"));
-        }
-
-        String statusi = puntori.getStatusi();
-
-if (statusi == null || !"a".equalsIgnoreCase(statusi.trim())) {
-    return ResponseEntity.status(HttpStatus.FORBIDDEN)
-            .body(Map.of("message", "Your employee account is inactive"));
-}
-
-        Long tenantId = TenantContext.getTenantId();
-
-        String accessToken = jwtUtil.generateToken(
-                puntori.getId(),
-                puntori.getUsername(),
-                "ROLE_PUNTOR",
-                tenantId
-        );
-
-        String refreshToken = jwtUtil.generateRefreshToken(
-                puntori.getId(),
-                puntori.getUsername(),
-                "ROLE_PUNTOR",
-                tenantId
-        );
-
-        return ResponseEntity.ok(
-                Map.of(
-                        "accessToken", accessToken,
-                        "refreshToken", refreshToken
-                )
-        );
+        return ResponseEntity.badRequest()
+                .body(Map.of("message", "Username and password are required"));
     }
 
+    puntori puntori = puntoriRepository
+            .findByUsername(dto.username().trim())
+            .orElse(null);
+
+    if (puntori == null ||
+            !passwordEncoder.matches(dto.password(), puntori.getPassword())) {
+
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(Map.of("message", "Invalid username or password"));
+    }
+
+    String statusi = puntori.getStatusi();
+
+    if (statusi == null || !"a".equalsIgnoreCase(statusi.trim())) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("message", "Your employee account is inactive"));
+    }
+
+    Long tenantId = TenantContext.getTenantId();
+
+    String accessToken = jwtUtil.generateToken(
+            puntori.getId(),
+            puntori.getUsername(),
+            "ROLE_PUNTOR",
+            tenantId
+    );
+
+    String refreshToken = jwtUtil.generateRefreshToken(
+            puntori.getId(),
+            puntori.getUsername(),
+            "ROLE_PUNTOR",
+            tenantId
+    );
+
+    ResponseCookie cookie = ResponseCookie.from("PuntoriRefreshToken", refreshToken)
+            .httpOnly(true)
+            .secure(true)
+            .path("/")
+            .maxAge(7 * 24 * 60 * 60)
+            .sameSite("None")
+            .build();
+
+    response.addHeader("Set-Cookie", cookie.toString());
+
+    return ResponseEntity.ok(
+            Map.of("accessToken", accessToken)
+    );
+}
+
+// REFRESH ACCESS TOKEN
+@PostMapping("/refresh")
+public ResponseEntity<?> refresh(
+        @CookieValue(name = "PuntoriRefreshToken", required = false)
+        String refreshToken
+) {
+
+    if (refreshToken == null || !jwtUtil.validateRefreshToken(refreshToken)) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(Map.of("message", "Invalid refresh token"));
+    }
+
+    if (!"ROLE_PUNTOR".equals(jwtUtil.extractRole(refreshToken))) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("message", "Employee refresh token required"));
+    }
+
+    Long tenantId = jwtUtil.extractTenantId(refreshToken);
+
+    if (tenantId == null || !tenantId.equals(TenantContext.getTenantId())) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("message", "Tenant mismatch"));
+    }
+
+    Long id = jwtUtil.extractId(refreshToken);
+    String username = jwtUtil.extractUsername(refreshToken);
+
+    puntori puntori = puntoriRepository.findById(id)
+            .orElse(null);
+
+    if (puntori == null ||
+            !puntori.getUsername().equals(username)) {
+
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(Map.of("message", "Employee not found"));
+    }
+
+    if (puntori.getStatusi() == null ||
+            !"a".equalsIgnoreCase(puntori.getStatusi().trim())) {
+
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("message", "Employee account is inactive"));
+    }
+
+    String newAccessToken = jwtUtil.generateToken(
+            id,
+            username,
+            "ROLE_PUNTOR",
+            tenantId
+    );
+
+    String newRefreshToken = jwtUtil.generateRefreshToken(
+            id,
+            username,
+            "ROLE_PUNTOR",
+            tenantId
+    );
+
+    ResponseCookie cookie = ResponseCookie.from("PuntoriRefreshToken", newRefreshToken)
+            .httpOnly(true)
+            .secure(true)
+            .path("/")
+            .maxAge(7 * 24 * 60 * 60)
+            .sameSite("None")
+            .build();
+
+    return ResponseEntity.ok()
+            .header("Set-Cookie", cookie.toString())
+            .body(Map.of("accessToken", newAccessToken));
+}
     // GET LOGGED-IN EMPLOYEE DATA
     @GetMapping("/data")
     public ResponseEntity<?> getMyData(
@@ -143,7 +226,7 @@ if (statusi == null || !"a".equalsIgnoreCase(statusi.trim())) {
     }
 
     // UPDATE OWN ACCOUNT
-@PutMapping("/me")
+@PutMapping("/data")
 public ResponseEntity<?> updateMyData(
         @RequestHeader("Authorization") String authorization,
         @RequestBody UpdatePuntoriDTO dto

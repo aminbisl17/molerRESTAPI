@@ -7,11 +7,15 @@ import com.example.moler.dto.CompanyDTO.RegisterCompanyDTO;
 import com.example.moler.dto.CompanyDTO.VerifyCompanyCodeDTO;
 import com.example.moler.model.menaxheri;
 import com.example.moler.repository.MenaxheriRepository;
+
+import jakarta.servlet.http.HttpServletResponse;
+
 import com.example.moler.authentication.JwtUtil;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -92,7 +96,7 @@ public class AuthController {
     @PostMapping("/menaxheri/refresh")
     public ResponseEntity<?> refresh(@RequestBody Map<String, String> request) {
 
-        String refreshToken = request.get("refreshToken");
+        String refreshToken = request.get("MenaxheriRefreshToken");
 
         if (refreshToken == null || !jwtUtil.validateRefreshToken(refreshToken)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
@@ -129,17 +133,30 @@ public class AuthController {
     }
 
     // 3. LOGOUT / DELETE REFRESH TOKEN
-    @PostMapping("/menaxheri/logout")
-    public ResponseEntity<?> logout() {
+    // 3. LOGOUT / DELETE REFRESH TOKEN
+@PostMapping("/menaxheri/logout")
+public ResponseEntity<?> logout(HttpServletResponse response) {
 
-        // This endpoint will need server-side refresh-token storage
-        // to invalidate the token properly.
+    String[] cookieNames = {
+            "MenaxheriRefreshToken",
+            "PuntoriRefreshToken"
+    };
 
-        return ResponseEntity.ok(
-                Map.of("message", "Logout successful")
-        );
+    for (String cookieName : cookieNames) {
+
+        ResponseCookie cookie = ResponseCookie.from(cookieName, "")
+                .httpOnly(true)
+                .secure(true)
+                .path("/")
+                .maxAge(0)
+                .sameSite("None")
+                .build();
+
+        response.addHeader("Set-Cookie", cookie.toString());
     }
 
+    return ResponseEntity.noContent().build();
+}
 
     @PostMapping("/company/login")
     public ResponseEntity<?> login(
