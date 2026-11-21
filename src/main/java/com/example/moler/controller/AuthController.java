@@ -138,8 +138,7 @@ public class AuthController {
 public ResponseEntity<?> logout(HttpServletResponse response) {
 
     String[] cookieNames = {
-            "MenaxheriRefreshToken",
-            "PuntoriRefreshToken"
+            "refreshToken"
     };
 
     for (String cookieName : cookieNames) {
