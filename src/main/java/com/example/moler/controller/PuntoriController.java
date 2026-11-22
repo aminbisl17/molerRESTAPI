@@ -153,7 +153,9 @@ public ResponseEntity<?> login(
                 puntori.getUsername(),
                 puntori.getPozita(),
                 puntori.getRrogaDitore(),
-                puntori.getStatusi()
+                puntori.getStatusi(),
+                puntori.getDataKrijimit(),
+                puntori.getDataEDeaktivizimit()
         );
 
         return ResponseEntity.ok(response);
@@ -258,7 +260,9 @@ if (dto.numriTelefonit() != null) {
             saved.getUsername(),
             saved.getPozita(),
             saved.getRrogaDitore(),
-            saved.getStatusi()
+            saved.getStatusi(),
+            saved.getDataKrijimit(),
+            saved.getDataEDeaktivizimit()        
     );
 
     return ResponseEntity.ok(response);

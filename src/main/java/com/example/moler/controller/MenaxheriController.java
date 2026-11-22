@@ -314,7 +314,9 @@ public ResponseEntity<?> registerPuntori(
             savedPuntori.getUsername(),
             savedPuntori.getPozita(),
             savedPuntori.getRrogaDitore(),
-            savedPuntori.getStatusi()
+            savedPuntori.getStatusi(),
+            savedPuntori.getDataKrijimit(),
+            savedPuntori.getDataEDeaktivizimit()
     );
 
     return ResponseEntity.status(HttpStatus.CREATED).body(response);
@@ -398,7 +400,9 @@ public ResponseEntity<?> updatePuntori(
             updated.getUsername(),
             updated.getPozita(),
             updated.getRrogaDitore(),
-            updated.getStatusi()
+            updated.getStatusi(),
+            updated.getDataKrijimit(),
+            updated.getDataEDeaktivizimit()
     );
 
     return ResponseEntity.ok(response);
@@ -435,7 +439,9 @@ public ResponseEntity<?> getAllPuntori() {
                     puntori.getUsername(),
                     puntori.getPozita(),
                     puntori.getRrogaDitore(),
-                    puntori.getStatusi()
+                    puntori.getStatusi(),
+                    puntori.getDataKrijimit(),
+                    puntori.getDataEDeaktivizimit()
             ))
             .toList();
 

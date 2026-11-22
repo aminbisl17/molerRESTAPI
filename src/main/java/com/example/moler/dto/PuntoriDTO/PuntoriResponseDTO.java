@@ -1,6 +1,6 @@
 package com.example.moler.dto.PuntoriDTO;
-
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 public record PuntoriResponseDTO(
         Long id,
@@ -10,5 +10,7 @@ public record PuntoriResponseDTO(
         String username,
         String pozita,
         BigDecimal rrogaDitore,
-        String statusi
+        String statusi,
+        LocalDateTime dataKrijimit,
+        LocalDateTime dataEDeaktivizimit
 ) {}
