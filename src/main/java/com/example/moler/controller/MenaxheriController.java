@@ -290,7 +290,6 @@ public ResponseEntity<?> registerPuntori(
     puntori.setEmri(dto.emri().trim());
     puntori.setMbiemri(dto.mbiemri().trim());
     puntori.setNumriTelefonit(dto.numriTelefonit().trim());
-    puntori.setEmail(dto.email());
     puntori.setUsername(dto.username().trim());
 
     // Hash password
@@ -312,7 +311,6 @@ public ResponseEntity<?> registerPuntori(
             savedPuntori.getEmri(),
             savedPuntori.getMbiemri(),
             savedPuntori.getNumriTelefonit(),
-            savedPuntori.getEmail(),
             savedPuntori.getUsername(),
             savedPuntori.getPozita(),
             savedPuntori.getRrogaDitore(),
@@ -380,9 +378,6 @@ public ResponseEntity<?> updatePuntori(
         puntori.setNumriTelefonit(phone);
     }
 
-    if (dto.email() != null) {
-        puntori.setEmail(dto.email().trim());
-    }
 
     if (dto.rrogaDitore() != null) {
         if (dto.rrogaDitore().signum() < 0) {
@@ -400,7 +395,6 @@ public ResponseEntity<?> updatePuntori(
             updated.getEmri(),
             updated.getMbiemri(),
             updated.getNumriTelefonit(),
-            updated.getEmail(),
             updated.getUsername(),
             updated.getPozita(),
             updated.getRrogaDitore(),
@@ -438,7 +432,6 @@ public ResponseEntity<?> getAllPuntori() {
                     puntori.getEmri(),
                     puntori.getMbiemri(),
                     puntori.getNumriTelefonit(),
-                    puntori.getEmail(),
                     puntori.getUsername(),
                     puntori.getPozita(),
                     puntori.getRrogaDitore(),

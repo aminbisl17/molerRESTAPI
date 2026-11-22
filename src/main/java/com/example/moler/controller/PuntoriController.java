@@ -150,7 +150,6 @@ public ResponseEntity<?> login(
                 puntori.getEmri(),
                 puntori.getMbiemri(),
                 puntori.getNumriTelefonit(),
-                puntori.getEmail(),
                 puntori.getUsername(),
                 puntori.getPozita(),
                 puntori.getRrogaDitore(),
@@ -202,23 +201,23 @@ public ResponseEntity<?> updateMyData(
                 .body(Map.of("message", "Employee not found"));
     }
 
-    // UPDATE EMAIL
-    if (dto.email() != null) {
+    // UPDATE PHONE NUMBER
+if (dto.numriTelefonit() != null) {
 
-        String email = dto.email().trim();
+    String nrtel = dto.numriTelefonit().trim();
 
-        if (email.isBlank()) {
-            return ResponseEntity.badRequest()
-                    .body(Map.of("message", "Email cannot be empty"));
-        }
-
-        if (puntoriRepository.existsByEmailAndIdNot(email, employeeId)) {
-            return ResponseEntity.badRequest()
-                    .body(Map.of("message", "Email is already in use"));
-        }
-
-        puntori.setEmail(email);
+    if (nrtel.isBlank()) {
+        return ResponseEntity.badRequest()
+                .body(Map.of("message", "Phone number cannot be empty"));
     }
+
+    if (puntoriRepository.existsByNumriTelefonitAndIdNot(nrtel, employeeId)) {
+        return ResponseEntity.badRequest()
+                .body(Map.of("message", "Phone number is already in use"));
+    }
+
+    puntori.setNumriTelefonit(nrtel);
+}
 
     // UPDATE USERNAME
     if (dto.username() != null) {
@@ -256,7 +255,6 @@ public ResponseEntity<?> updateMyData(
             saved.getEmri(),
             saved.getMbiemri(),
             saved.getNumriTelefonit(),
-            saved.getEmail(),
             saved.getUsername(),
             saved.getPozita(),
             saved.getRrogaDitore(),

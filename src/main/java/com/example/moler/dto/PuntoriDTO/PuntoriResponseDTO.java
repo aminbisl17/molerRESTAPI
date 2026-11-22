@@ -7,7 +7,6 @@ public record PuntoriResponseDTO(
         String emri,
         String mbiemri,
         String numriTelefonit,
-        String email,
         String username,
         String pozita,
         BigDecimal rrogaDitore,

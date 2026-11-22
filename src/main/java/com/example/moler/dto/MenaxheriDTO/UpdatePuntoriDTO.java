@@ -6,7 +6,6 @@ public record UpdatePuntoriDTO(
         String emri,
         String mbiemri,
         String numriTelefonit,
-        String email,
         String pozita,
         BigDecimal rrogaDitore,
         String statusi

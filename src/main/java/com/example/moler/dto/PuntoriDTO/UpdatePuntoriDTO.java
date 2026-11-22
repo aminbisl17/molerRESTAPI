@@ -1,7 +1,7 @@
 package com.example.moler.dto.PuntoriDTO;
 
 public record UpdatePuntoriDTO(
-        String email,
+        String numriTelefonit,
         String username,
         String password
 ) {}

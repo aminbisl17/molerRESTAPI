@@ -21,9 +21,6 @@ public class puntori {
     @Column(name = "numri_telefonit", nullable = false, length = 20)
     private String numriTelefonit;
 
-    @Column(name = "email", length = 255)
-    private String email;
-
     @Column(name = "username", nullable = false, unique = true, length = 100)
     private String username;
 
@@ -42,6 +39,12 @@ public class puntori {
     @Column(name = "data_krijimit", insertable = false, updatable = false)
     private LocalDateTime dataKrijimit;
 
+   @Column(name = "data_e_deaktivizimit", insertable = false, updatable = false)
+private LocalDateTime dataEDeaktivizimit; 
+
+public LocalDateTime getDataEDeaktivizimit() {
+    return dataEDeaktivizimit;
+}
     public Long getId() {
         return id;
     }
@@ -72,14 +75,6 @@ public class puntori {
 
     public void setNumriTelefonit(String numriTelefonit) {
         this.numriTelefonit = numriTelefonit;
-    }
-
-    public String getEmail() {
-        return email;
-    }
-
-    public void setEmail(String email) {
-        this.email = email;
     }
 
     public String getUsername() {
