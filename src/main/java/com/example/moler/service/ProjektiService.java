@@ -360,21 +360,10 @@ public ProjektiDetailsResponse getProjektiById(Long id) {
             );
 
     return new ProjektiDetailsResponse(
-            p.getId(),
-            p.getEmri(),
-            p.getLokacioni(),
-            p.getKerkesa(),
-            p.getStatusi(),
-            p.getPrioriteti(),
-            p.getStatusiProjektit(),
-            p.getAmbienti(),
-            p.getDataKrijimit(),
-            p.getDataFillimitTePlanifikuar(),
-            p.getDataPerfundimitTePlanifikuar(),
-            menaxheret,
-            puntoret,
-            materialet,
-            detajet
-    );
+        menaxheret,
+        puntoret,
+        materialet,
+        detajet
+);
 }
 }
