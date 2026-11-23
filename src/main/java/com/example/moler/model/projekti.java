@@ -1,6 +1,8 @@
+
 package com.example.moler.model;
 
 import jakarta.persistence.*;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
@@ -29,8 +31,19 @@ public class projekti {
     @Column(name = "statusi_projektit", nullable = false, length = 2)
     private String statusiProjektit;
 
+    @Column(name = "ambienti", nullable = false, length = 2)
+    private String ambienti;
+
+    @Column(name = "data_fillimit_te_planifikuar")
+    private LocalDate dataFillimitTePlanifikuar;
+
+    @Column(name = "data_perfundimit_te_planifikuar")
+    private LocalDate dataPerfundimitTePlanifikuar;
+
     @Column(name = "data_krijimit", insertable = false, updatable = false)
     private LocalDateTime dataKrijimit;
+
+    public projekti() {}
 
     public Long getId() {
         return id;
@@ -88,6 +101,30 @@ public class projekti {
         this.statusiProjektit = statusiProjektit;
     }
 
+    public String getAmbienti() {
+        return ambienti;
+    }
+
+    public void setAmbienti(String ambienti) {
+        this.ambienti = ambienti;
+    }
+
+    public LocalDate getDataFillimitTePlanifikuar() {
+        return dataFillimitTePlanifikuar;
+    }
+
+    public void setDataFillimitTePlanifikuar(LocalDate dataFillimitTePlanifikuar) {
+        this.dataFillimitTePlanifikuar = dataFillimitTePlanifikuar;
+    }
+
+    public LocalDate getDataPerfundimitTePlanifikuar() {
+        return dataPerfundimitTePlanifikuar;
+    }
+
+    public void setDataPerfundimitTePlanifikuar(LocalDate dataPerfundimitTePlanifikuar) {
+        this.dataPerfundimitTePlanifikuar = dataPerfundimitTePlanifikuar;
+    }
+
     public LocalDateTime getDataKrijimit() {
         return dataKrijimit;
     }
@@ -95,8 +132,4 @@ public class projekti {
     public void setDataKrijimit(LocalDateTime dataKrijimit) {
         this.dataKrijimit = dataKrijimit;
     }
-
-    public projekti() {}
-
-    // Generate getters and setters
 }
