@@ -2,6 +2,7 @@
 package com.example.moler.service;
 
 import com.example.moler.dto.Projekti.CreateProjektiRequest;
+import com.example.moler.dto.Projekti.ProjektiDetailsResponse;
 import com.example.moler.dto.Projekti.ProjektiResponse;
 import com.example.moler.exception.ResourceNotFoundException;
 
@@ -308,15 +309,72 @@ public class ProjektiService {
                 projekti.getDataKrijimit()
         );
     }
-    @Transactional(readOnly = true)
-public List<Object[]> getProjektiById(Long id) {
 
-    if (!projektiRepository.existsById(id)) {
-        throw new ResourceNotFoundException(
-                "Projekti me ID " + id + " nuk ekziston."
-        );
-    }
+@Transactional(readOnly = true)
+public ProjektiDetailsResponse getProjektiById(Long id) {
 
-    return projektiRepository.findProjektiWithDetailsById(id);
+    projekti p = projektiRepository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException(
+                    "Projekti me ID " + id + " nuk ekziston."
+            ));
+
+    List<Long> menaxheret =
+            prezencaMenaxheretRepository.findByProjekti_Id(id)
+                    .stream()
+                    .map(pm -> pm.getMenaxheri().getId())
+                    .toList();
+
+    List<Long> puntoret =
+            prezencaPuntoretRepository.findByProjekti_Id(id)
+                    .stream()
+                    .map(pp -> pp.getPuntori().getId())
+                    .toList();
+
+    List<ProjektiDetailsResponse.MaterialResponse> materialet =
+            projektiMaterialiRepository.findByProjekti_Id(id)
+                    .stream()
+                    .map(pm -> new ProjektiDetailsResponse.MaterialResponse(
+                            pm.getMateriali().getId(),
+                            pm.getMateriali().getEmri(),
+                            pm.getMateriali().getKategoria(),
+                            pm.getMateriali().getCmimi(),
+                            pm.getSasia(),
+                            pm.getCmimiNeMomentinEPerdorimit()
+                    ))
+                    .toList();
+
+    projektidetajet d = projektidetajetRepository.findByProjektiId(id)
+            .orElseThrow(() -> new ResourceNotFoundException(
+                    "Detajet e projektit me ID " + id + " nuk ekzistojne."
+            ));
+
+    ProjektiDetailsResponse.DetajetResponse detajet =
+            new ProjektiDetailsResponse.DetajetResponse(
+                    d.getM2(),
+                    d.getPagesa(),
+                    d.getPershkrimi(),
+                    d.getDitaFillimit(),
+                    d.getDitaAnulimit(),
+                    d.getDitaPerfundimit(),
+                    d.getPershkrimiAnulimit()
+            );
+
+    return new ProjektiDetailsResponse(
+            p.getId(),
+            p.getEmri(),
+            p.getLokacioni(),
+            p.getKerkesa(),
+            p.getStatusi(),
+            p.getPrioriteti(),
+            p.getStatusiProjektit(),
+            p.getAmbienti(),
+            p.getDataKrijimit(),
+            p.getDataFillimitTePlanifikuar(),
+            p.getDataPerfundimitTePlanifikuar(),
+            menaxheret,
+            puntoret,
+            materialet,
+            detajet
+    );
 }
 }

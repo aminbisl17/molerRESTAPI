@@ -12,4 +12,5 @@ public interface ProjektiDetajetRepository
     Optional<projektidetajet> findByProjektiId(Long projektiId);
 
     boolean existsByProjektiId(Long projektiId);
+    
 }
