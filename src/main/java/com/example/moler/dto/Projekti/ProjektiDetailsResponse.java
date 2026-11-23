@@ -6,12 +6,28 @@ import java.util.List;
 
 public record ProjektiDetailsResponse(
 
-        List<Long> menaxheret,
-        List<Long> puntoret,
+        List<MenaxherResponse> menaxheret,
+
+        List<PuntorResponse> puntoret,
+
         List<MaterialResponse> materialet,
+
         DetajetResponse detajet
 
 ) {
+
+    public record MenaxherResponse(
+            Long id,
+            String emri,
+            String mbiemri
+    ) {}
+
+    public record PuntorResponse(
+            Long id,
+            String emri,
+            String mbiemri,
+            String pozita
+    ) {}
 
     public record MaterialResponse(
             Long idMaterialit,

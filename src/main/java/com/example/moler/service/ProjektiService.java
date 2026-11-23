@@ -309,27 +309,38 @@ public class ProjektiService {
                 projekti.getDataKrijimit()
         );
     }
-
 @Transactional(readOnly = true)
 public ProjektiDetailsResponse getProjektiById(Long id) {
 
-    projekti p = projektiRepository.findById(id)
+    projektiRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException(
                     "Projekti me ID " + id + " nuk ekziston."
             ));
 
-    List<Long> menaxheret =
+    // Menaxheret: ID, emri, mbiemri
+    List<ProjektiDetailsResponse.MenaxherResponse> menaxheret =
             prezencaMenaxheretRepository.findByProjekti_Id(id)
                     .stream()
-                    .map(pm -> pm.getMenaxheri().getId())
+                    .map(pm -> new ProjektiDetailsResponse.MenaxherResponse(
+                            pm.getMenaxheri().getId(),
+                            pm.getMenaxheri().getEmri(),
+                            pm.getMenaxheri().getMbiemri()
+                    ))
                     .toList();
 
-    List<Long> puntoret =
+    // Puntoret: ID, emri, mbiemri, pozita
+    List<ProjektiDetailsResponse.PuntorResponse> puntoret =
             prezencaPuntoretRepository.findByProjekti_Id(id)
                     .stream()
-                    .map(pp -> pp.getPuntori().getId())
+                    .map(pp -> new ProjektiDetailsResponse.PuntorResponse(
+                            pp.getPuntori().getId(),
+                            pp.getPuntori().getEmri(),
+                            pp.getPuntori().getMbiemri(),
+                            pp.getPuntori().getPozita()
+                    ))
                     .toList();
 
+    // Materialet
     List<ProjektiDetailsResponse.MaterialResponse> materialet =
             projektiMaterialiRepository.findByProjekti_Id(id)
                     .stream()
@@ -343,6 +354,7 @@ public ProjektiDetailsResponse getProjektiById(Long id) {
                     ))
                     .toList();
 
+    // Detajet e projektit
     projektidetajet d = projektidetajetRepository.findByProjektiId(id)
             .orElseThrow(() -> new ResourceNotFoundException(
                     "Detajet e projektit me ID " + id + " nuk ekzistojne."
@@ -360,10 +372,10 @@ public ProjektiDetailsResponse getProjektiById(Long id) {
             );
 
     return new ProjektiDetailsResponse(
-        menaxheret,
-        puntoret,
-        materialet,
-        detajet
-);
+            menaxheret,
+            puntoret,
+            materialet,
+            detajet
+    );
 }
 }
