@@ -7,19 +7,21 @@ import com.example.moler.exception.ResourceNotFoundException;
 
 import com.example.moler.model.projekti;
 import com.example.moler.model.menaxheri;
-import com.example.moler.model.materiali;
 import com.example.moler.model.puntori;
+import com.example.moler.model.materiali;
+import com.example.moler.model.projektidetajet;
 import com.example.moler.model.ProjektiMateriali;
 import com.example.moler.model.ProjektiPrezencaMenaxheret;
 import com.example.moler.model.ProjektiPrezencaPuntoret;
 
 import com.example.moler.repository.ProjektiRepository;
 import com.example.moler.repository.MenaxheriRepository;
-import com.example.moler.repository.MaterialiRepository;
 import com.example.moler.repository.PuntoriRepository;
+import com.example.moler.repository.MaterialiRepository;
 import com.example.moler.repository.ProjektiMaterialiRepository;
 import com.example.moler.repository.ProjektiPrezencaMenaxheretRepository;
 import com.example.moler.repository.ProjektiPrezencaPuntoretRepository;
+import com.example.moler.repository.ProjektiDetajetRepository;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -43,6 +45,7 @@ public class ProjektiService {
     private final ProjektiMaterialiRepository projektiMaterialiRepository;
     private final ProjektiPrezencaMenaxheretRepository prezencaMenaxheretRepository;
     private final ProjektiPrezencaPuntoretRepository prezencaPuntoretRepository;
+    private final ProjektiDetajetRepository projektidetajetRepository;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -54,7 +57,8 @@ public class ProjektiService {
             MaterialiRepository materialiRepository,
             ProjektiMaterialiRepository projektiMaterialiRepository,
             ProjektiPrezencaMenaxheretRepository prezencaMenaxheretRepository,
-            ProjektiPrezencaPuntoretRepository prezencaPuntoretRepository
+            ProjektiPrezencaPuntoretRepository prezencaPuntoretRepository,
+            ProjektiDetajetRepository projektidetajetRepository
     ) {
         this.projektiRepository = projektiRepository;
         this.menaxheriRepository = menaxheriRepository;
@@ -63,6 +67,7 @@ public class ProjektiService {
         this.projektiMaterialiRepository = projektiMaterialiRepository;
         this.prezencaMenaxheretRepository = prezencaMenaxheretRepository;
         this.prezencaPuntoretRepository = prezencaPuntoretRepository;
+        this.projektidetajetRepository = projektidetajetRepository;
     }
 
     @Transactional
@@ -71,7 +76,7 @@ public class ProjektiService {
             Long idMenaxherit
     ) {
 
-        // 1. Find the manager creating the project
+        // 1. Validate the manager creating the project
         menaxheri krijuesi = menaxheriRepository.findById(idMenaxherit)
                 .orElseThrow(() ->
                         new ResourceNotFoundException(
@@ -79,7 +84,38 @@ public class ProjektiService {
                         )
                 );
 
-        // 2. Create project
+        // 2. Validate project details
+        if (request.detajet() == null) {
+            throw new IllegalArgumentException(
+                    "Detajet e projektit jane te detyrueshme."
+            );
+        }
+
+        if (request.detajet().m2() == null) {
+            throw new IllegalArgumentException(
+                    "Siperfaqja m2 eshte e detyrueshme."
+            );
+        }
+
+        if (request.detajet().pagesa() == null) {
+            throw new IllegalArgumentException(
+                    "Pagesa eshte e detyrueshme."
+            );
+        }
+
+        if (request.detajet().m2().compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalArgumentException(
+                    "Siperfaqja m2 nuk mund te jete negative."
+            );
+        }
+
+        if (request.detajet().pagesa().compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalArgumentException(
+                    "Pagesa nuk mund te jete negative."
+            );
+        }
+
+        // 3. Create project
         projekti projekti = new projekti();
 
         projekti.setEmri(request.emri());
@@ -109,14 +145,24 @@ public class ProjektiService {
                 request.dataPerfundimitTePlanifikuar()
         );
 
-        // 3. Save project and retrieve database-generated values
+        // 4. Save project and retrieve database-generated values
         projekti = projektiRepository.saveAndFlush(projekti);
 
         entityManager.refresh(projekti);
 
-        // 4. Assign managers
-        // The manager creating the project is always assigned automatically.
-        // Additional managers from the request are also assigned.
+        // 5. Create project details
+        projektidetajet detajet = new projektidetajet();
+
+        detajet.setProjekti(projekti);
+        detajet.setM2(request.detajet().m2());
+        detajet.setPagesa(request.detajet().pagesa());
+        detajet.setPershkrimi(request.detajet().pershkrimi());
+
+        projektidetajetRepository.save(detajet);
+
+        // 6. Assign managers
+        // The manager creating the project is always assigned.
+        // Additional managers are taken from the request.
 
         Set<Long> managerIds = new LinkedHashSet<>();
 
@@ -157,7 +203,7 @@ public class ProjektiService {
 
         prezencaMenaxheretRepository.saveAll(managerAssignments);
 
-        // 5. Assign workers
+        // 7. Assign workers
         if (request.puntoret() != null
                 && !request.puntoret().isEmpty()) {
 
@@ -197,7 +243,7 @@ public class ProjektiService {
             prezencaPuntoretRepository.saveAll(workerAssignments);
         }
 
-        // 6. Add materials
+        // 8. Add materials
         if (request.materialet() != null
                 && !request.materialet().isEmpty()) {
 
@@ -238,7 +284,7 @@ public class ProjektiService {
                 projektiMateriali.setMateriali(materiali);
                 projektiMateriali.setSasia(materialRequest.sasia());
 
-                // Preserve material price at assignment time
+                // Preserve the material price at assignment time
                 projektiMateriali.setCmimiNeMomentinEPerdorimit(
                         materiali.getCmimi()
                 );
@@ -249,7 +295,7 @@ public class ProjektiService {
             projektiMaterialiRepository.saveAll(materialet);
         }
 
-        // 7. Return created project
+        // 9. Return created project
         return new ProjektiResponse(
                 projekti.getId(),
                 projekti.getEmri(),

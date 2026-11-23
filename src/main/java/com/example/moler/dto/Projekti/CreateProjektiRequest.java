@@ -1,7 +1,7 @@
 package com.example.moler.dto.Projekti;
 
-import java.time.LocalDate;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 
 public record CreateProjektiRequest(
@@ -14,11 +14,18 @@ public record CreateProjektiRequest(
         LocalDate dataPerfundimitTePlanifikuar,
         List<Long> menaxheret,
         List<Long> puntoret,
-        List<MaterialRequest> materialet
+        List<MaterialRequest> materialet,
+        DetajetRequest detajet
 ) {
+
     public record MaterialRequest(
             Long idMaterialit,
             BigDecimal sasia
-    ) {
-    }
+    ) {}
+
+    public record DetajetRequest(
+            BigDecimal m2,
+            BigDecimal pagesa,
+            String pershkrimi
+    ) {}
 }
