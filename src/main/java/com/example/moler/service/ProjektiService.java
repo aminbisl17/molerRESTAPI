@@ -1,8 +1,9 @@
+
 package com.example.moler.service;
 
 import com.example.moler.dto.Projekti.CreateProjektiRequest;
 import com.example.moler.dto.Projekti.ProjektiResponse;
-
+import com.example.moler.exception.ResourceNotFoundException;
 import com.example.moler.model.projekti;
 import com.example.moler.model.menaxheri;
 import com.example.moler.model.materiali;
@@ -51,10 +52,12 @@ public class ProjektiService {
             Long idMenaxherit
     ) {
 
-        // 1. Find the manager who is creating the project
-        menaxheri menaxheri = menaxheriRepository.findById(idMenaxherit)
+        // 1. Find the manager creating the project
+        menaxheri krijuesi = menaxheriRepository.findById(idMenaxherit)
                 .orElseThrow(() ->
-                        new RuntimeException("Menaxheri nuk u gjet.")
+                        new ResourceNotFoundException(
+                                "Menaxheri nuk ekziston."
+                        )
                 );
 
         // 2. Create project
@@ -87,42 +90,49 @@ public class ProjektiService {
                 request.dataPerfundimitTePlanifikuar()
         );
 
-        // Save project first to generate its ID
+        // 3. Save project to generate its ID
         projekti = projektiRepository.save(projekti);
 
-        // 3. Automatically assign the creating manager to the project
-        ProjektiPrezencaMenaxheret prezenca = new ProjektiPrezencaMenaxheret();
+        // 4. Automatically assign the creating manager
+        ProjektiPrezencaMenaxheret prezenca =
+                new ProjektiPrezencaMenaxheret();
 
         prezenca.setProjekti(projekti);
-        prezenca.setMenaxheri(menaxheri);
+        prezenca.setMenaxheri(krijuesi);
 
         prezencaMenaxheretRepository.save(prezenca);
 
-        // 4. Add materials if provided
-        if (request.materialet() != null && !request.materialet().isEmpty()) {
+        // 5. Add materials if provided
+        if (request.materialet() != null
+                && !request.materialet().isEmpty()) {
 
             List<ProjektiMateriali> materialet = new ArrayList<>();
 
             for (CreateProjektiRequest.MaterialRequest materialRequest
                     : request.materialet()) {
 
+                // Find material
                 materiali materiali = materialiRepository
                         .findById(materialRequest.idMaterialit())
                         .orElseThrow(() ->
-                                new RuntimeException(
+                                new ResourceNotFoundException(
                                         "Materiali me ID "
                                                 + materialRequest.idMaterialit()
-                                                + " nuk u gjet."
+                                                + " nuk ekziston."
                                 )
                         );
 
+                // Validate quantity
                 if (materialRequest.sasia() == null
-                        || materialRequest.sasia().compareTo(BigDecimal.ZERO) <= 0) {
+                        || materialRequest.sasia()
+                                .compareTo(BigDecimal.ZERO) <= 0) {
+
                     throw new IllegalArgumentException(
                             "Sasia e materialit duhet te jete me e madhe se zero."
                     );
                 }
 
+                // Create project-material relationship
                 ProjektiMateriali projektiMateriali =
                         new ProjektiMateriali();
 
@@ -130,7 +140,7 @@ public class ProjektiService {
                 projektiMateriali.setMateriali(materiali);
                 projektiMateriali.setSasia(materialRequest.sasia());
 
-                // Preserve the material's price at the time of assignment
+                // Save material price at assignment time
                 projektiMateriali.setCmimiNeMomentinEPerdorimit(
                         materiali.getCmimi()
                 );
@@ -141,7 +151,7 @@ public class ProjektiService {
             projektiMaterialiRepository.saveAll(materialet);
         }
 
-        // 5. Return created project
+        // 6. Return created project
         return new ProjektiResponse(
                 projekti.getId(),
                 projekti.getEmri(),
