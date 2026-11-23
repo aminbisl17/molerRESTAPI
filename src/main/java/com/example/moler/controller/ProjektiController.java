@@ -80,4 +80,51 @@ public class ProjektiController {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(response);
     }
+
+    @GetMapping("/{id}")
+public ResponseEntity<?> getProjektiById(
+        @RequestHeader(value = "Authorization", required = false)
+        String authorization,
+
+        @PathVariable Long id
+) {
+
+    // 1. Check authorization header
+    if (authorization == null || authorization.isBlank()) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(Map.of(
+                        "status", 401,
+                        "message", "Access token mungon."
+                ));
+    }
+
+    // 2. Check Bearer token format
+    if (!authorization.startsWith("Bearer ")
+            || authorization.substring(7).isBlank()) {
+
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(Map.of(
+                        "status", 401,
+                        "message", "Formati i access token eshte i pavlefshem."
+                ));
+    }
+
+    // 3. Validate token
+    String token = authorization.substring(7);
+
+    try {
+        jwtUtil.extractId(token);
+    } catch (Exception e) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(Map.of(
+                        "status", 401,
+                        "message", "Access token eshte i pavlefshem ose ka skaduar."
+                ));
+    }
+
+    // 4. Get project
+    return ResponseEntity.ok(
+            projektiService.getProjektiById(id)
+    );
+}
 }

@@ -308,4 +308,15 @@ public class ProjektiService {
                 projekti.getDataKrijimit()
         );
     }
+    @Transactional(readOnly = true)
+public List<Object[]> getProjektiById(Long id) {
+
+    if (!projektiRepository.existsById(id)) {
+        throw new ResourceNotFoundException(
+                "Projekti me ID " + id + " nuk ekziston."
+        );
+    }
+
+    return projektiRepository.findProjektiWithDetailsById(id);
+}
 }
