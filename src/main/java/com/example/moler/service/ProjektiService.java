@@ -378,4 +378,23 @@ public ProjektiDetailsResponse getProjektiById(Long id) {
             detajet
     );
 }
+
+@Transactional(readOnly = true)
+public List<ProjektiResponse> getAllProjektet() {
+
+    return projektiRepository.findAll()
+            .stream()
+            .map(p -> new ProjektiResponse(
+                    p.getId(),
+                    p.getEmri(),
+                    p.getLokacioni(),
+                    p.getStatusi(),
+                    p.getPrioriteti(),
+                    p.getAmbienti(),
+                    p.getDataFillimitTePlanifikuar(),
+                    p.getDataPerfundimitTePlanifikuar(),
+                    p.getDataKrijimit()
+            ))
+            .toList();
+}
 }

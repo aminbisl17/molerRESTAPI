@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -125,6 +126,13 @@ public ResponseEntity<?> getProjektiById(
     // 4. Get project
     return ResponseEntity.ok(
             projektiService.getProjektiById(id)
+    );
+}
+@GetMapping
+public ResponseEntity<List<ProjektiResponse>> getAllProjektet() {
+
+    return ResponseEntity.ok(
+            projektiService.getAllProjektet()
     );
 }
 }
