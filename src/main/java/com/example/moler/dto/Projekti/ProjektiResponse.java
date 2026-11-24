@@ -1,3 +1,4 @@
+
 package com.example.moler.dto.Projekti;
 
 import java.time.LocalDate;
@@ -7,6 +8,7 @@ public record ProjektiResponse(
         Long id,
         String emri,
         String lokacioni,
+        String kerkesa,
         String statusi,
         String prioriteti,
         String ambienti,
