@@ -3,6 +3,7 @@ package com.example.moler.controller;
 
 import com.example.moler.authentication.JwtUtil;
 import com.example.moler.dto.Projekti.CreateProjektiRequest;
+import com.example.moler.dto.Projekti.ProjektiFormDataResponse;
 import com.example.moler.dto.Projekti.ProjektiResponse;
 import com.example.moler.service.ProjektiService;
 
@@ -135,4 +136,15 @@ public ResponseEntity<List<ProjektiResponse>> getAllProjektet() {
             projektiService.getAllProjektet()
     );
 }
+
+
+@GetMapping("/form-data")
+public ResponseEntity<ProjektiFormDataResponse> getProjektiFormData() {
+
+    return ResponseEntity.ok(
+            projektiService.getProjektiFormData()
+   
+        );
+}
+
 }

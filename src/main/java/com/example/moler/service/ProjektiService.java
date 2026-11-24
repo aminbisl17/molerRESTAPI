@@ -3,6 +3,7 @@ package com.example.moler.service;
 
 import com.example.moler.dto.Projekti.CreateProjektiRequest;
 import com.example.moler.dto.Projekti.ProjektiDetailsResponse;
+import com.example.moler.dto.Projekti.ProjektiFormDataResponse;
 import com.example.moler.dto.Projekti.ProjektiResponse;
 import com.example.moler.exception.ResourceNotFoundException;
 
@@ -397,4 +398,51 @@ public List<ProjektiResponse> getAllProjektet() {
             ))
             .toList();
 }
+
+
+@Transactional(readOnly = true)
+public ProjektiFormDataResponse getProjektiFormData() {
+
+    // All managers: ID, name, surname
+    List<ProjektiFormDataResponse.MenaxherResponse> menaxheret =
+            menaxheriRepository.findAll()
+                    .stream()
+                    .map(m -> new ProjektiFormDataResponse.MenaxherResponse(
+                            m.getId(),
+                            m.getEmri(),
+                            m.getMbiemri()
+                    ))
+                    .toList();
+
+    // All workers: ID, name, surname, position
+    List<ProjektiFormDataResponse.PuntorResponse> puntoret =
+            puntoriRepository.findAll()
+                    .stream()
+                    .map(p -> new ProjektiFormDataResponse.PuntorResponse(
+                            p.getId(),
+                            p.getEmri(),
+                            p.getMbiemri(),
+                            p.getPozita()
+                    ))
+                    .toList();
+
+    // All materials: all material fields
+    List<ProjektiFormDataResponse.MaterialResponse> materialet =
+            materialiRepository.findAll()
+                    .stream()
+                    .map(m -> new ProjektiFormDataResponse.MaterialResponse(
+                            m.getId(),
+                            m.getEmri(),
+                            m.getCmimi(),
+                            m.getKategoria()
+                    ))
+                    .toList();
+
+    return new ProjektiFormDataResponse(
+            menaxheret,
+            puntoret,
+            materialet
+    );
+}
+
 }
