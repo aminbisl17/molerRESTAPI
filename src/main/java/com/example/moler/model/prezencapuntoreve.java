@@ -81,7 +81,8 @@ public class prezencapuntoreve {
     }
 
     public String getStatusi() {
-        return statusi;
+        // Column is char(2): SQL Server pads "v"/"c" to "v "/"c ", so trim it
+        return statusi == null ? null : statusi.trim();
     }
 
     public void setStatusi(String statusi) {
