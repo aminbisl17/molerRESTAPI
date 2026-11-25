@@ -90,15 +90,14 @@ public class PrezencaService {
         return prezencaRepository.saveAll(prezencat);
     }
 
-    @Transactional(readOnly = true)
+  @Transactional(readOnly = true)
 public PrezencaFormDataResponse getFormData(Long idPuntorit) {
 
-    // Check if worker exists
-    puntori puntori = puntoriRepository.findById(idPuntorit)
+    puntoriRepository.findById(idPuntorit)
             .orElseThrow(() ->
                     new RuntimeException("Puntori nuk ekziston"));
 
-    // Get latest attendance application date
+    // Latest attendance date, excluding completed projects
     LocalDate ditaFundit =
             prezencaRepository.findLatestDitaByPuntoriId(idPuntorit);
 
@@ -107,16 +106,19 @@ public PrezencaFormDataResponse getFormData(Long idPuntorit) {
     if (ditaFundit != null) {
 
         projektetEFundit = prezencaRepository
-                .findAllByPuntori_IdAndDita(idPuntorit, ditaFundit)
+                .findLatestAttendanceByPuntoriId(idPuntorit, ditaFundit)
                 .stream()
                 .map(p -> p.getProjekti().getId())
                 .distinct()
                 .toList();
     }
 
-    // Get all projects the worker belongs to
+    // All projects assigned to this worker, excluding completed projects
     List<PrezencaFormDataResponse.ProjektiData> projektet =
-            projektiPrezencaRepository.findByPuntori_Id(idPuntorit)
+            projektiPrezencaRepository
+                    .findAllByPuntori_IdAndProjekti_StatusiNot(
+                            idPuntorit, "c"
+                    )
                     .stream()
                     .map(p -> new PrezencaFormDataResponse.ProjektiData(
                             p.getProjekti().getId(),

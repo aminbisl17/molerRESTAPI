@@ -36,15 +36,27 @@ public interface PrezencaPuntoreveRepository
             LocalDate dita
     );
 
-        @Query("""
+    @Query("""
         SELECT MAX(p.dita)
         FROM prezencapuntoreve p
         WHERE p.puntori.id = :idPuntorit
+        AND p.projekti.statusi <> 'c'
     """)
     LocalDate findLatestDitaByPuntoriId(
             @Param("idPuntorit") Long idPuntorit
     );
 
+    @Query("""
+        SELECT p
+        FROM prezencapuntoreve p
+        WHERE p.puntori.id = :idPuntorit
+        AND p.dita = :dita
+        AND p.projekti.statusi <> 'c'
+    """)
+    List<prezencapuntoreve> findLatestAttendanceByPuntoriId(
+            @Param("idPuntorit") Long idPuntorit,
+            @Param("dita") LocalDate dita
+    );
     List<prezencapuntoreve> findAllByPuntori_IdAndDita(
             Long idPuntorit,
             LocalDate dita

@@ -20,5 +20,11 @@ public interface ProjektiPrezencaPuntoretRepository
             Long idPuntorit
     );
 
+      List<ProjektiPrezencaPuntoret>
+    findAllByPuntori_IdAndProjekti_StatusiNot(
+            Long idPuntorit,
+            String statusi
+    );
+    
     void deleteByProjekti_Id(Long idProjekti);
 }
