@@ -46,7 +46,7 @@ public ResponseEntity<?> login(
             || dto.password() == null || dto.password().isBlank()) {
 
         return ResponseEntity.badRequest()
-                .body(Map.of("message", "Username and password are required"));
+                .body(Map.of("message", "Emri dhe fjalkalimi i përdoruesit janë të obligueshme!"));
     }
 
     puntori puntori = puntoriRepository
@@ -57,14 +57,14 @@ public ResponseEntity<?> login(
             !passwordEncoder.matches(dto.password(), puntori.getPassword())) {
 
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(Map.of("message", "Invalid username or password"));
+                .body(Map.of("message", "Emri i përdoruesit ose fjalkalimi nuk është i sakt!"));
     }
 
     String statusi = puntori.getStatusi();
 
     if (statusi == null || !"a".equalsIgnoreCase(statusi.trim())) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(Map.of("message", "Your account is inactive"));
+                .body(Map.of("message", "Llogaria e juaj është joaktive"));
     }
 
     Long tenantId = TenantContext.getTenantId();
@@ -112,19 +112,19 @@ public ResponseEntity<?> login(
 
         if (authorization == null || !authorization.startsWith("Bearer ")) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("message", "Authorization token is required"));
+                    .body(Map.of("message", "Nevoitet tokeni i autorizuar"));
         }
 
         String token = authorization.substring(7);
 
         if (!jwtUtil.validateToken(token)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("message", "Invalid or expired token"));
+                    .body(Map.of("message", "Tokeni nuk është valid ose ka skaduar"));
         }
 
         if (!"ROLE_PUNTOR".equals(jwtUtil.extractRole(token))) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(Map.of("message", "Employee access required"));
+                    .body(Map.of("message", "Nevoitet qasja e punonjësit"));
         }
 
         Long tokenTenantId = jwtUtil.extractTenantId(token);

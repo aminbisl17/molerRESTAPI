@@ -123,7 +123,7 @@ public ResponseEntity<?> refresh(
                 || !"a".equalsIgnoreCase(puntori.getStatusi().trim())) {
 
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(Map.of("message", "Employee account is inactive"));
+                    .body(Map.of("message", "Llogaria është joaktive"));
         }
     }
 
