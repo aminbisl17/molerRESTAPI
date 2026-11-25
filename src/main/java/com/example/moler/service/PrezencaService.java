@@ -261,10 +261,21 @@ public class PrezencaService {
 
         boolean kaAplikuarSot = prezencaESotme.isPresent();
 
-        // Today's status: "nv", "v", or null if not applied
+        // Today's status: "nv", "v", "c", or null if not applied
         String statusi = prezencaESotme
                 .map(prezencapuntoreve::getStatusi)
                 .orElse(null);
+
+        // Cancellation details only when canceled
+        boolean eshteAnuluar = "c".equals(statusi);
+
+        String arsyejaAnulimit = eshteAnuluar
+                ? prezencaESotme.get().getArsyejaAnulimit()
+                : null;
+
+        LocalDateTime dataAnulimit = eshteAnuluar
+                ? prezencaESotme.get().getDataAnulimit()
+                : null;
 
         // Find latest attendance date, excluding completed projects
         LocalDate ditaFundit =
@@ -299,7 +310,9 @@ public class PrezencaService {
                 projektetEFundit,
                 projektet,
                 kaAplikuarSot,
-                statusi
+                statusi,
+                arsyejaAnulimit,
+                dataAnulimit
         );
     }
 }
