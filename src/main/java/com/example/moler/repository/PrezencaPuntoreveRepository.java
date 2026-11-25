@@ -89,4 +89,22 @@ boolean existsByPuntori_IdAndDita(
     List<prezencapuntoreve> findPaVerifikuaraByMenaxheriId(
             @Param("idMenaxherit") Long idMenaxherit
     );
+
+    // Of the given ids, the ones on projects this manager is responsible for
+    @Query("""
+        SELECT p
+        FROM prezencapuntoreve p
+        JOIN FETCH p.projekti pr
+        WHERE p.id IN :ids
+          AND EXISTS (
+              SELECT 1
+              FROM ProjektiPrezencaMenaxheret m
+              WHERE m.projekti = pr
+                AND m.menaxheri.id = :idMenaxherit
+          )
+    """)
+    List<prezencapuntoreve> findByIdInAndMenaxheriId(
+            @Param("ids") List<Long> ids,
+            @Param("idMenaxherit") Long idMenaxherit
+    );
 }

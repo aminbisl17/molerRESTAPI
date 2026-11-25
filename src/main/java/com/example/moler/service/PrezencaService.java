@@ -130,6 +130,52 @@ public class PrezencaService {
         prezencaRepository.deleteAll(prezencat);
     }
 
+    @Transactional
+    public void verifikoPrezencat(List<Long> idPrezencave, Long idMenaxherit) {
+
+        if (idMenaxherit == null) {
+            throw new IllegalArgumentException("Menaxheri eshte i detyrueshem");
+        }
+
+        if (idPrezencave == null || idPrezencave.isEmpty()) {
+            throw new IllegalArgumentException("Duhet te zgjidhni te pakten nje prezence");
+        }
+
+        if (idPrezencave.stream().anyMatch(id -> id == null)) {
+            throw new IllegalArgumentException("ID e prezences nuk eshte valide");
+        }
+
+        List<Long> ids = idPrezencave.stream().distinct().toList();
+
+        List<prezencapuntoreve> prezencat =
+                prezencaRepository.findByIdInAndMenaxheriId(ids, idMenaxherit);
+
+        // Every id must exist and belong to one of this manager's projects
+        if (prezencat.size() != ids.size()) {
+            List<Long> gjetura = prezencat.stream()
+                    .map(prezencapuntoreve::getId)
+                    .toList();
+            List<Long> mungojne = ids.stream()
+                    .filter(id -> !gjetura.contains(id))
+                    .toList();
+            throw new ResourceNotFoundException(
+                    "Prezencat nuk u gjeten ose nuk jane ne projektet tuaja: " + mungojne);
+        }
+
+        List<Long> teVerifikuara = prezencat.stream()
+                .filter(p -> !"nv".equals(p.getStatusi()))
+                .map(prezencapuntoreve::getId)
+                .toList();
+
+        if (!teVerifikuara.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "Prezencat jane verifikuar tashme: " + teVerifikuara);
+        }
+
+        prezencat.forEach(p -> p.setStatusi("v"));
+        prezencaRepository.saveAll(prezencat);
+    }
+
     @Transactional(readOnly = true)
     public List<PrezencaPaVerifikuarResponse> getPrezencatPaVerifikuara(Long idMenaxherit) {
 
