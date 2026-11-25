@@ -2,6 +2,8 @@ package com.example.moler.repository;
 
 import com.example.moler.model.prezencapuntoreve;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
@@ -31,6 +33,20 @@ public interface PrezencaPuntoreveRepository
     boolean existsByProjektiIdAndPuntoriIdAndDita(
             Long projektiId,
             Long puntoriId,
+            LocalDate dita
+    );
+
+        @Query("""
+        SELECT MAX(p.dita)
+        FROM prezencapuntoreve p
+        WHERE p.puntori.id = :idPuntorit
+    """)
+    LocalDate findLatestDitaByPuntoriId(
+            @Param("idPuntorit") Long idPuntorit
+    );
+
+    List<prezencapuntoreve> findAllByPuntori_IdAndDita(
+            Long idPuntorit,
             LocalDate dita
     );
 }

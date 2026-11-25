@@ -154,6 +154,7 @@ public class SecurityConfig {
                         "/puntori/**"
                 ).hasRole("PUNTOR")
 
+                .requestMatchers("/prezenca/**").hasAnyRole("PUNTOR", "MENAXHER")
                 // EVERYTHING ELSE
                 .anyRequest().authenticated()
             )
