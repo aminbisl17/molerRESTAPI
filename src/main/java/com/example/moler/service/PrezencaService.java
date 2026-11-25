@@ -62,7 +62,7 @@ public class PrezencaService {
                 .findById(idPuntorit)
                 .orElseThrow(() -> new RuntimeException("Puntori nuk ekziston"));
 
-        LocalDate dita = LocalDate.now(ZoneId.of("Europe/Pristina"));
+        LocalDate dita = LocalDate.now(ZoneId.of("Europe/Skopje"));
 
         List<prezencapuntoreve> prezencat = new ArrayList<>();
 
