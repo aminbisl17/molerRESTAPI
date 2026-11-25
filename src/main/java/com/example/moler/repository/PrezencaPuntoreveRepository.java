@@ -70,4 +70,23 @@ boolean existsByPuntori_IdAndDita(
             Long idPuntorit,
             LocalDate dita
     );
+
+    // Unverified attendance on projects this manager is responsible for
+    @Query("""
+        SELECT p
+        FROM prezencapuntoreve p
+        JOIN FETCH p.puntori pu
+        JOIN FETCH p.projekti pr
+        WHERE p.statusi = 'nv'
+          AND EXISTS (
+              SELECT 1
+              FROM ProjektiPrezencaMenaxheret m
+              WHERE m.projekti = pr
+                AND m.menaxheri.id = :idMenaxherit
+          )
+        ORDER BY p.dita DESC, pu.id, pr.id
+    """)
+    List<prezencapuntoreve> findPaVerifikuaraByMenaxheriId(
+            @Param("idMenaxherit") Long idMenaxherit
+    );
 }

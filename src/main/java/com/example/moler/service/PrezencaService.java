@@ -3,6 +3,7 @@ package com.example.moler.service;
 
 import com.example.moler.dto.Prezenca.AplikoPrezenceRequest;
 import com.example.moler.dto.Prezenca.PrezencaFormDataResponse;
+import com.example.moler.dto.Prezenca.PrezencaPaVerifikuarResponse;
 import com.example.moler.exception.ResourceNotFoundException;
 import com.example.moler.model.ProjektiPrezencaPuntoret;
 import com.example.moler.model.prezencapuntoreve;
@@ -19,7 +20,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class PrezencaService {
@@ -125,6 +128,50 @@ public class PrezencaService {
         }
 
         prezencaRepository.deleteAll(prezencat);
+    }
+
+    @Transactional(readOnly = true)
+    public List<PrezencaPaVerifikuarResponse> getPrezencatPaVerifikuara(Long idMenaxherit) {
+
+        if (idMenaxherit == null) {
+            throw new IllegalArgumentException("Menaxheri eshte i detyrueshem");
+        }
+
+        List<prezencapuntoreve> prezencat =
+                prezencaRepository.findPaVerifikuaraByMenaxheriId(idMenaxherit);
+
+        // Group rows by worker + day (one application = one row per project)
+        Map<String, List<prezencapuntoreve>> grupet = new LinkedHashMap<>();
+        for (prezencapuntoreve p : prezencat) {
+            String key = p.getPuntori().getId() + "_" + p.getDita();
+            grupet.computeIfAbsent(key, k -> new ArrayList<>()).add(p);
+        }
+
+        return grupet.values().stream()
+                .map(rows -> {
+                    puntori pu = rows.get(0).getPuntori();
+
+                    List<PrezencaPaVerifikuarResponse.ProjektiData> projektet =
+                            rows.stream()
+                                    .map(r -> new PrezencaPaVerifikuarResponse.ProjektiData(
+                                            r.getId(),
+                                            r.getProjekti().getId(),
+                                            r.getProjekti().getEmri(),
+                                            r.getProjekti().getKerkesa(),
+                                            r.getProjekti().getAmbienti()
+                                    ))
+                                    .toList();
+
+                    return new PrezencaPaVerifikuarResponse(
+                            pu.getId(),
+                            pu.getEmri(),
+                            pu.getMbiemri(),
+                            pu.getPozita(),
+                            rows.get(0).getDita(),
+                            projektet
+                    );
+                })
+                .toList();
     }
 
     @Transactional(readOnly = true)
