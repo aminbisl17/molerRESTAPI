@@ -4,6 +4,5 @@ import java.util.List;
 
 public record AplikoPrezenceRequest(
         List<Long> idProjektet,
-        Long idPuntorit,
         String llojiOrarit
 ) {}

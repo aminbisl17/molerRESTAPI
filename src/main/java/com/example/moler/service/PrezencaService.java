@@ -39,10 +39,12 @@ public class PrezencaService {
 
     @Transactional
     public List<prezencapuntoreve> aplikoPrezence(
-            AplikoPrezenceRequest request
+            AplikoPrezenceRequest request,
+            Long idPuntorit
+
     ) {
 
-        if (request.idPuntorit() == null) {
+        if (idPuntorit == null) {
             throw new RuntimeException("Puntori eshte i detyrueshem");
         }
 
@@ -57,7 +59,7 @@ public class PrezencaService {
 
         // Check worker
         puntori puntori = puntoriRepository
-                .findById(request.idPuntorit())
+                .findById(idPuntorit)
                 .orElseThrow(() -> new RuntimeException("Puntori nuk ekziston"));
 
         LocalDate dita = LocalDate.now(ZoneId.of("Europe/Pristina"));
