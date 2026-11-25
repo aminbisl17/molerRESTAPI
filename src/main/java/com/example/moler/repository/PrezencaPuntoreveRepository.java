@@ -35,7 +35,8 @@ public interface PrezencaPuntoreveRepository
             Long puntoriId,
             LocalDate dita
     );
-
+    
+    
     @Query("""
         SELECT MAX(p.dita)
         FROM prezencapuntoreve p
@@ -55,12 +56,14 @@ LocalDate findLatestDitaByPuntoriId(
       AND p.statusi = 'v'
       AND p.projekti.statusi <> 'c'
 """)
-
-boolean existsByPuntori_IdAndDita(Long idPuntorit, LocalDate dita);
-
 List<prezencapuntoreve> findLatestAttendanceByPuntoriId(
         @Param("idPuntorit") Long idPuntorit,
         @Param("dita") LocalDate dita
+);
+
+boolean existsByPuntori_IdAndDita(
+        Long idPuntorit,
+        LocalDate dita
 );
 
     List<prezencapuntoreve> findAllByPuntori_IdAndDita(
