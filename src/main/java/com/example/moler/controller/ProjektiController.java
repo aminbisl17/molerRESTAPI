@@ -5,6 +5,7 @@ import com.example.moler.authentication.JwtUtil;
 import com.example.moler.dto.Projekti.CreateProjektiRequest;
 import com.example.moler.dto.Projekti.ProjektiFormDataResponse;
 import com.example.moler.dto.Projekti.ProjektiResponse;
+import com.example.moler.dto.Projekti.UpdateProjektiRequest;
 import com.example.moler.service.ProjektiService;
 
 import org.springframework.http.HttpStatus;
@@ -147,4 +148,15 @@ public ResponseEntity<ProjektiFormDataResponse> getProjektiFormData() {
         );
 }
 
+@PutMapping("/{id}")
+public ResponseEntity<?> updateProjekti(
+        @PathVariable Long id,
+
+        @RequestBody UpdateProjektiRequest request
+) {
+    // 4. Update project
+    return ResponseEntity.ok(
+            projektiService.updateProjekti(id, request)
+    );
+}
 }

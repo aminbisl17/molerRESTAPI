@@ -5,6 +5,7 @@ import com.example.moler.dto.Projekti.CreateProjektiRequest;
 import com.example.moler.dto.Projekti.ProjektiDetailsResponse;
 import com.example.moler.dto.Projekti.ProjektiFormDataResponse;
 import com.example.moler.dto.Projekti.ProjektiResponse;
+import com.example.moler.dto.Projekti.UpdateProjektiRequest;
 import com.example.moler.exception.ResourceNotFoundException;
 
 import com.example.moler.model.projekti;
@@ -32,14 +33,18 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 @Service
 public class ProjektiService {
 
+    private static final Set<String> STATUSET = Set.of("w", "e", "cm", "c");
     private final ProjektiRepository projektiRepository;
     private final MenaxheriRepository menaxheriRepository;
     private final PuntoriRepository puntoriRepository;
@@ -445,6 +450,242 @@ public ProjektiFormDataResponse getProjektiFormData() {
             puntoret,
             materialet
     );
+}
+
+@Transactional
+public ProjektiResponse updateProjekti(Long id, UpdateProjektiRequest request) {
+
+    projekti p = projektiRepository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException(
+                    "Projekti me ID " + id + " nuk ekziston."
+            ));
+
+    projektidetajet detajet = projektidetajetRepository.findByProjektiId(id)
+            .orElseThrow(() -> new ResourceNotFoundException(
+                    "Detajet e projektit me ID " + id + " nuk ekzistojne."
+            ));
+
+    // 1. Basic fields
+    if (request.emri() != null) p.setEmri(request.emri());
+    if (request.lokacioni() != null) p.setLokacioni(request.lokacioni());
+    if (request.kerkesa() != null) p.setKerkesa(request.kerkesa());
+    if (request.prioriteti() != null) p.setPrioriteti(request.prioriteti());
+    if (request.ambienti() != null) p.setAmbienti(request.ambienti());
+
+    if (request.dataFillimitTePlanifikuar() != null) {
+        p.setDataFillimitTePlanifikuar(request.dataFillimitTePlanifikuar());
+    }
+    if (request.dataPerfundimitTePlanifikuar() != null) {
+        p.setDataPerfundimitTePlanifikuar(request.dataPerfundimitTePlanifikuar());
+    }
+
+    if (p.getDataFillimitTePlanifikuar() != null
+            && p.getDataPerfundimitTePlanifikuar() != null
+            && p.getDataPerfundimitTePlanifikuar()
+                    .isBefore(p.getDataFillimitTePlanifikuar())) {
+        throw new IllegalArgumentException(
+                "Data e perfundimit nuk mund te jete para dates se fillimit."
+        );
+    }
+
+    // 2. Status + automatic dates
+    if (request.statusi() != null) {
+        String newStatus = request.statusi().trim().toLowerCase();
+
+        if (!STATUSET.contains(newStatus)) {
+            throw new IllegalArgumentException(
+                    "Statusi i projektit nuk eshte i vlefshem."
+            );
+        }
+
+        String oldStatus = p.getStatusi() == null ? "" : p.getStatusi().trim();
+
+        if (!newStatus.equals(oldStatus)) {
+            p.setStatusi(newStatus);
+            applyStatusDates(detajet, newStatus);
+        }
+    }
+
+    // Cancellation description is optional and only stored on cancelled projects
+    String currentStatus = p.getStatusi() == null ? "" : p.getStatusi().trim();
+    if ("c".equals(currentStatus) && request.pershkrimiAnulimit() != null) {
+        String text = request.pershkrimiAnulimit().trim();
+        detajet.setPershkrimiAnulimit(text.isEmpty() ? null : text);
+    }
+
+    // 3. Project details (m2, pagesa, pershkrimi)
+    if (request.detajet() != null) {
+        UpdateProjektiRequest.DetajetRequest d = request.detajet();
+
+        if (d.m2() != null) {
+            if (d.m2().compareTo(BigDecimal.ZERO) < 0) {
+                throw new IllegalArgumentException(
+                        "Siperfaqja m2 nuk mund te jete negative."
+                );
+            }
+            detajet.setM2(d.m2());
+        }
+
+        if (d.pagesa() != null) {
+            if (d.pagesa().compareTo(BigDecimal.ZERO) < 0) {
+                throw new IllegalArgumentException(
+                        "Pagesa nuk mund te jete negative."
+                );
+            }
+            detajet.setPagesa(d.pagesa());
+        }
+
+        if (d.pershkrimi() != null) detajet.setPershkrimi(d.pershkrimi());
+    }
+
+    projektiRepository.save(p);
+    projektidetajetRepository.save(detajet);
+
+    // 4. Managers (replace the whole set when provided)
+    if (request.menaxheret() != null) {
+        prezencaMenaxheretRepository.deleteAll(
+                prezencaMenaxheretRepository.findByProjekti_Id(id)
+        );
+        entityManager.flush();
+
+        List<ProjektiPrezencaMenaxheret> assignments = new ArrayList<>();
+
+        for (Long managerId : new LinkedHashSet<>(request.menaxheret())) {
+            if (managerId == null) {
+                throw new IllegalArgumentException(
+                        "ID e menaxherit nuk mund te jete bosh."
+                );
+            }
+
+            menaxheri manager = menaxheriRepository.findById(managerId)
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Menaxheri me ID " + managerId + " nuk ekziston."
+                    ));
+
+            ProjektiPrezencaMenaxheret a = new ProjektiPrezencaMenaxheret();
+            a.setProjekti(p);
+            a.setMenaxheri(manager);
+            assignments.add(a);
+        }
+
+        prezencaMenaxheretRepository.saveAll(assignments);
+    }
+
+    // 5. Workers (replace the whole set when provided)
+    if (request.puntoret() != null) {
+        prezencaPuntoretRepository.deleteAll(
+                prezencaPuntoretRepository.findByProjekti_Id(id)
+        );
+        entityManager.flush();
+
+        List<ProjektiPrezencaPuntoret> assignments = new ArrayList<>();
+
+        for (Long workerId : new LinkedHashSet<>(request.puntoret())) {
+            if (workerId == null) {
+                throw new IllegalArgumentException(
+                        "ID e puntorit nuk mund te jete bosh."
+                );
+            }
+
+            puntori worker = puntoriRepository.findById(workerId)
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Puntori me ID " + workerId + " nuk ekziston."
+                    ));
+
+            ProjektiPrezencaPuntoret a = new ProjektiPrezencaPuntoret();
+            a.setProjekti(p);
+            a.setPuntori(worker);
+            assignments.add(a);
+        }
+
+        prezencaPuntoretRepository.saveAll(assignments);
+    }
+
+    // 6. Materials (replace the whole set when provided)
+    if (request.materialet() != null) {
+        List<ProjektiMateriali> existing =
+                projektiMaterialiRepository.findByProjekti_Id(id);
+
+        // Remember the price already locked in for materials that stay on the project
+        Map<Long, BigDecimal> lockedPrices = new HashMap<>();
+        for (ProjektiMateriali pm : existing) {
+            lockedPrices.put(
+                    pm.getMateriali().getId(),
+                    pm.getCmimiNeMomentinEPerdorimit()
+            );
+        }
+
+        projektiMaterialiRepository.deleteAll(existing);
+        entityManager.flush();
+
+        List<ProjektiMateriali> materialet = new ArrayList<>();
+
+        for (UpdateProjektiRequest.MaterialRequest mr : request.materialet()) {
+            if (mr.idMaterialit() == null) {
+                throw new IllegalArgumentException(
+                        "ID e materialit nuk mund te jete bosh."
+                );
+            }
+
+            if (mr.sasia() == null || mr.sasia().compareTo(BigDecimal.ZERO) <= 0) {
+                throw new IllegalArgumentException(
+                        "Sasia e materialit duhet te jete me e madhe se zero."
+                );
+            }
+
+            materiali m = materialiRepository.findById(mr.idMaterialit())
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Materiali me ID " + mr.idMaterialit() + " nuk ekziston."
+                    ));
+
+            ProjektiMateriali pm = new ProjektiMateriali();
+            pm.setProjekti(p);
+            pm.setMateriali(m);
+            pm.setSasia(mr.sasia());
+
+            // Keep the old locked price if the material was already on the project,
+            // otherwise lock the current price
+            BigDecimal locked = lockedPrices.get(m.getId());
+            pm.setCmimiNeMomentinEPerdorimit(locked != null ? locked : m.getCmimi());
+
+            materialet.add(pm);
+        }
+
+        projektiMaterialiRepository.saveAll(materialet);
+    }
+
+    // 7. Return updated project
+    return new ProjektiResponse(
+            p.getId(),
+            p.getEmri(),
+            p.getLokacioni(),
+            p.getKerkesa(),
+            p.getStatusi(),
+            p.getPrioriteti(),
+            p.getAmbienti(),
+            p.getDataFillimitTePlanifikuar(),
+            p.getDataPerfundimitTePlanifikuar(),
+            p.getDataKrijimit()
+    );
+}
+
+/**
+ * Called only when the status changes. Clears the dates that belong to the
+ * old state, then stamps the one for the new state.
+ */
+private void applyStatusDates(projektidetajet d, String status) {
+    LocalDateTime now = LocalDateTime.now();
+
+    d.setDitaPerfundimit(null);
+    d.setDitaAnulimit(null);
+    d.setPershkrimiAnulimit(null);
+
+    switch (status) {
+        case "e" -> d.setDitaFillimit(now);
+        case "cm" -> d.setDitaPerfundimit(now);
+        case "c" -> d.setDitaAnulimit(now);
+        default -> { } // "w": no date
+    }
 }
 
 }
