@@ -1,7 +1,9 @@
+
 package com.example.moler.service;
 
 import com.example.moler.dto.Prezenca.AplikoPrezenceRequest;
 import com.example.moler.dto.Prezenca.PrezencaFormDataResponse;
+import com.example.moler.model.ProjektiPrezencaPuntoret;
 import com.example.moler.model.prezencapuntoreve;
 import com.example.moler.model.projekti;
 import com.example.moler.model.puntori;
@@ -25,6 +27,7 @@ public class PrezencaService {
     private final ProjektiRepository projektiRepository;
     private final PuntoriRepository puntoriRepository;
     private final ProjektiPrezencaPuntoretRepository projektiPrezencaRepository;
+
     public PrezencaService(
             PrezencaPuntoreveRepository prezencaRepository,
             ProjektiRepository projektiRepository,
@@ -41,7 +44,6 @@ public class PrezencaService {
     public List<prezencapuntoreve> aplikoPrezence(
             AplikoPrezenceRequest request,
             Long idPuntorit
-
     ) {
 
         if (idPuntorit == null) {
@@ -53,16 +55,21 @@ public class PrezencaService {
         }
 
         if (!"h".equals(request.llojiOrarit()) &&
-            !"f".equals(request.llojiOrarit())) {
+                !"f".equals(request.llojiOrarit())) {
             throw new RuntimeException("Lloji i orarit duhet te jete h ose f");
         }
 
-        // Check worker
         puntori puntori = puntoriRepository
                 .findById(idPuntorit)
-                .orElseThrow(() -> new RuntimeException("Puntori nuk ekziston"));
+                .orElseThrow(() ->
+                        new RuntimeException("Puntori nuk ekziston"));
 
         LocalDate dita = LocalDate.now(ZoneId.of("Europe/Skopje"));
+
+        // Prevent applying more than once per day
+        if (prezencaRepository.existsByPuntori_IdAndDita(idPuntorit, dita)) {
+            throw new RuntimeException("Keni aplikuar tashme per sot");
+        }
 
         List<prezencapuntoreve> prezencat = new ArrayList<>();
 
@@ -75,8 +82,7 @@ public class PrezencaService {
             projekti projekti = projektiRepository
                     .findById(idProjekti)
                     .orElseThrow(() ->
-                            new RuntimeException("Projekti nuk ekziston: " + idProjekti)
-                    );
+                            new RuntimeException("Projekti nuk ekziston: " + idProjekti));
 
             prezencapuntoreve prezenca = new prezencapuntoreve();
 
@@ -92,47 +98,57 @@ public class PrezencaService {
         return prezencaRepository.saveAll(prezencat);
     }
 
-  @Transactional(readOnly = true)
-public PrezencaFormDataResponse getFormData(Long idPuntorit) {
+    @Transactional(readOnly = true)
+    public PrezencaFormDataResponse getFormData(Long idPuntorit) {
 
-    puntoriRepository.findById(idPuntorit)
-            .orElseThrow(() ->
-                    new RuntimeException("Puntori nuk ekziston"));
+        puntoriRepository.findById(idPuntorit)
+                .orElseThrow(() ->
+                        new RuntimeException("Puntori nuk ekziston"));
 
-    // Latest attendance date, excluding completed projects
-    LocalDate ditaFundit =
-            prezencaRepository.findLatestDitaByPuntoriId(idPuntorit);
+        LocalDate sot = LocalDate.now(ZoneId.of("Europe/Skopje"));
 
-    List<Long> projektetEFundit = new ArrayList<>();
+        // Check whether the worker has already applied today
+        boolean kaAplikuarSot =
+                prezencaRepository.existsByPuntori_IdAndDita(
+                        idPuntorit, sot
+                );
 
-    if (ditaFundit != null) {
+        // Find latest VERIFIED attendance date, excluding completed projects
+        LocalDate ditaFundit =
+                prezencaRepository.findLatestDitaByPuntoriId(idPuntorit);
 
-        projektetEFundit = prezencaRepository
-                .findLatestAttendanceByPuntoriId(idPuntorit, ditaFundit)
-                .stream()
-                .map(p -> p.getProjekti().getId())
-                .distinct()
-                .toList();
-    }
+        List<Long> projektetEFundit = new ArrayList<>();
 
-    // All projects assigned to this worker, excluding completed projects
-    List<PrezencaFormDataResponse.ProjektiData> projektet =
-            projektiPrezencaRepository
-                    .findAllByPuntori_IdAndProjekti_StatusiNot(
-                            idPuntorit, "c"
-                    )
+        if (ditaFundit != null) {
+            projektetEFundit = prezencaRepository
+                    .findLatestAttendanceByPuntoriId(idPuntorit, ditaFundit)
                     .stream()
-                    .map(p -> new PrezencaFormDataResponse.ProjektiData(
-                            p.getProjekti().getId(),
-                            p.getProjekti().getEmri(),
-                            p.getProjekti().getKerkesa(),
-                            p.getProjekti().getAmbienti()
-                    ))
+                    .map(p -> p.getProjekti().getId())
+                    .distinct()
                     .toList();
+        }
 
-    return new PrezencaFormDataResponse(
-            projektetEFundit,
-            projektet
-    );
-}
+        // Get all projects assigned to this worker, excluding completed projects
+        List<ProjektiPrezencaPuntoret> projektetEPuntorit =
+                projektiPrezencaRepository
+                        .findAllByPuntori_IdAndProjekti_StatusiNot(
+                                idPuntorit, "c"
+                        );
+
+        List<PrezencaFormDataResponse.ProjektiData> projektet =
+                projektetEPuntorit.stream()
+                        .map(p -> new PrezencaFormDataResponse.ProjektiData(
+                                p.getProjekti().getId(),
+                                p.getProjekti().getEmri(),
+                                p.getProjekti().getKerkesa(),
+                                p.getProjekti().getAmbienti()
+                        ))
+                        .toList();
+
+        return new PrezencaFormDataResponse(
+                projektetEFundit,
+                projektet,
+                kaAplikuarSot
+        );
+    }
 }

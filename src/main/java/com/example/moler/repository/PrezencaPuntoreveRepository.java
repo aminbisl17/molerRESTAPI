@@ -55,6 +55,9 @@ LocalDate findLatestDitaByPuntoriId(
       AND p.statusi = 'v'
       AND p.projekti.statusi <> 'c'
 """)
+
+boolean existsByPuntori_IdAndDita(Long idPuntorit, LocalDate dita);
+
 List<prezencapuntoreve> findLatestAttendanceByPuntoriId(
         @Param("idPuntorit") Long idPuntorit,
         @Param("dita") LocalDate dita

@@ -4,7 +4,8 @@ import java.util.List;
 
 public record PrezencaFormDataResponse(
         List<Long> projektetEFundit,
-        List<ProjektiData> projektet
+        List<ProjektiData> projektet,
+        boolean kaAplikuarSot
 ) {
     public record ProjektiData(
             Long id,
