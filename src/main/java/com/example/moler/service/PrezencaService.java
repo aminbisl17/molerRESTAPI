@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
@@ -126,6 +127,46 @@ public class PrezencaService {
     @Transactional
     public void verifikoPrezencat(List<Long> idPrezencave, Long idMenaxherit) {
 
+        List<prezencapuntoreve> prezencat =
+                gjejPrezencatPerMenaxherin(idPrezencave, idMenaxherit);
+
+        prezencat.forEach(p -> p.setStatusi("v"));
+        prezencaRepository.saveAll(prezencat);
+    }
+
+    @Transactional
+    public void anuloPrezencat(
+            List<Long> idPrezencave,
+            String arsyejaAnulimit,
+            Long idMenaxherit
+    ) {
+
+        List<prezencapuntoreve> prezencat =
+                gjejPrezencatPerMenaxherin(idPrezencave, idMenaxherit);
+
+        String arsyeja = (arsyejaAnulimit == null || arsyejaAnulimit.isBlank())
+                ? null
+                : arsyejaAnulimit.trim();
+
+        LocalDateTime tani = LocalDateTime.now(ZoneId.of("Europe/Skopje"));
+
+        prezencat.forEach(p -> {
+            p.setStatusi("c");
+            p.setArsyejaAnulimit(arsyeja);
+            p.setDataAnulimit(tani);
+        });
+        prezencaRepository.saveAll(prezencat);
+    }
+
+    /**
+     * Loads the given attendance for a manager and checks that every id exists,
+     * includes at least one of the manager's projects, and is still "nv".
+     */
+    private List<prezencapuntoreve> gjejPrezencatPerMenaxherin(
+            List<Long> idPrezencave,
+            Long idMenaxherit
+    ) {
+
         if (idMenaxherit == null) {
             throw new IllegalArgumentException("Menaxheri eshte i detyrueshem");
         }
@@ -155,18 +196,18 @@ public class PrezencaService {
                     "Prezencat nuk u gjeten ose nuk jane ne projektet tuaja: " + mungojne);
         }
 
-        List<Long> teVerifikuara = prezencat.stream()
+        // Only attendance that is still not verified can be verified or canceled
+        List<Long> joNv = prezencat.stream()
                 .filter(p -> !"nv".equals(p.getStatusi()))
                 .map(prezencapuntoreve::getId)
                 .toList();
 
-        if (!teVerifikuara.isEmpty()) {
+        if (!joNv.isEmpty()) {
             throw new IllegalArgumentException(
-                    "Prezencat jane verifikuar tashme: " + teVerifikuara);
+                    "Prezencat jane verifikuar ose anuluar tashme: " + joNv);
         }
 
-        prezencat.forEach(p -> p.setStatusi("v"));
-        prezencaRepository.saveAll(prezencat);
+        return prezencat;
     }
 
     @Transactional(readOnly = true)
