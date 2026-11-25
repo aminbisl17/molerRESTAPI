@@ -67,4 +67,24 @@ public ResponseEntity<?> getFormData(
             prezencaService.getFormData(puntoriId)
     );
 }
+
+@DeleteMapping
+public ResponseEntity<?> fshiPrezencen(
+        @RequestHeader("Authorization") String authorization) {
+
+    if (authorization == null || !authorization.startsWith("Bearer ")) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(Map.of("message", "Access token is missing"));
+    }
+
+    String token = authorization.substring(7);
+
+    // Extract worker ID from JWT
+    Long puntoriId = jwtUtil.extractId(token);
+
+    // Delete today's attendance only if it is still not verified ("nv")
+    prezencaService.fshiPrezencenESotme(puntoriId);
+
+    return ResponseEntity.noContent().build();
+}
 }

@@ -3,6 +3,7 @@ package com.example.moler.service;
 
 import com.example.moler.dto.Prezenca.AplikoPrezenceRequest;
 import com.example.moler.dto.Prezenca.PrezencaFormDataResponse;
+import com.example.moler.exception.ResourceNotFoundException;
 import com.example.moler.model.ProjektiPrezencaPuntoret;
 import com.example.moler.model.prezencapuntoreve;
 import com.example.moler.model.projekti;
@@ -98,6 +99,34 @@ public class PrezencaService {
         return prezencaRepository.saveAll(prezencat);
     }
 
+    @Transactional
+    public void fshiPrezencenESotme(Long idPuntorit) {
+
+        if (idPuntorit == null) {
+            throw new IllegalArgumentException("Puntori eshte i detyrueshem");
+        }
+
+        LocalDate dita = LocalDate.now(ZoneId.of("Europe/Skopje"));
+
+        List<prezencapuntoreve> prezencat =
+                prezencaRepository.findAllByPuntori_IdAndDita(idPuntorit, dita);
+
+        if (prezencat.isEmpty()) {
+            throw new ResourceNotFoundException("Nuk keni prezence per sot");
+        }
+
+        // Only allow deletion if every record is still not verified
+        boolean kaVerifikuar = prezencat.stream()
+                .anyMatch(p -> !"nv".equals(p.getStatusi()));
+
+        if (kaVerifikuar) {
+            throw new IllegalArgumentException(
+                    "Prezenca eshte verifikuar dhe nuk mund te fshihet");
+        }
+
+        prezencaRepository.deleteAll(prezencat);
+    }
+
     @Transactional(readOnly = true)
     public PrezencaFormDataResponse getFormData(Long idPuntorit) {
 
@@ -108,10 +137,21 @@ public class PrezencaService {
         LocalDate sot = LocalDate.now(ZoneId.of("Europe/Skopje"));
 
         // Check whether the worker has already applied today
-        boolean kaAplikuarSot =
-                prezencaRepository.existsByPuntori_IdAndDita(
+        List<prezencapuntoreve> prezencatESotme =
+                prezencaRepository.findAllByPuntori_IdAndDita(
                         idPuntorit, sot
                 );
+
+        boolean kaAplikuarSot = !prezencatESotme.isEmpty();
+
+        // "nv" only if every record today is still not verified, otherwise "v"
+        String statusi = null;
+        if (kaAplikuarSot) {
+            statusi = prezencatESotme.stream()
+                    .allMatch(p -> "nv".equals(p.getStatusi()))
+                    ? "nv"
+                    : "v";
+        }
 
         // Find latest VERIFIED attendance date, excluding completed projects
         LocalDate ditaFundit =
@@ -148,7 +188,8 @@ public class PrezencaService {
         return new PrezencaFormDataResponse(
                 projektetEFundit,
                 projektet,
-                kaAplikuarSot
+                kaAplikuarSot,
+                statusi
         );
     }
 }
