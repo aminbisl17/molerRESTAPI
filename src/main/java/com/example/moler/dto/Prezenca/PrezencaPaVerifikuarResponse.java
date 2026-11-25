@@ -14,6 +14,7 @@ public record PrezencaPaVerifikuarResponse(
         String mbiemri,
         String pozita,
         LocalDate dita,
+        String llojiOrarit, // "h" or "f"
         List<ProjektiData> projektet
 ) {
     public record ProjektiData(

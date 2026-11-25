@@ -240,6 +240,7 @@ public class PrezencaService {
                             pu.getMbiemri(),
                             pu.getPozita(),
                             p.getDita(),
+                            p.getLlojiOrarit(),
                             projektet
                     );
                 })
