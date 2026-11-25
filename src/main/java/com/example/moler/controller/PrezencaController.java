@@ -94,7 +94,7 @@ public ResponseEntity<?> getPrezencatPaVerifikuara(
     );
 }
 
-@PatchMapping("/verifiko")
+@PatchMapping("/v")
 public ResponseEntity<?> verifikoPrezencat(
         @RequestHeader("Authorization") String authorization,
         @RequestBody VerifikoPrezenceRequest request) {
