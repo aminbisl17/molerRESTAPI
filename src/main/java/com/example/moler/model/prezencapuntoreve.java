@@ -3,6 +3,8 @@ package com.example.moler.model;
 import jakarta.persistence.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "Prezenca_Puntoreve")
@@ -12,9 +14,9 @@ public class prezencapuntoreve {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "id_projektit", nullable = false)
-    private projekti projekti;
+    // Projects worked on this day (prezenca_puntoreve_detajet)
+    @OneToMany(mappedBy = "prezenca", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<PrezencaPuntoreveDetajet> detajet = new ArrayList<>();
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_puntorit", nullable = false)
@@ -46,12 +48,12 @@ public class prezencapuntoreve {
         this.id = id;
     }
 
-    public projekti getProjekti() {
-        return projekti;
+    public List<PrezencaPuntoreveDetajet> getDetajet() {
+        return detajet;
     }
 
-    public void setProjekti(projekti projekti) {
-        this.projekti = projekti;
+    public void shtoProjekt(projekti projekti) {
+        detajet.add(new PrezencaPuntoreveDetajet(this, projekti));
     }
 
     public puntori getPuntori() {

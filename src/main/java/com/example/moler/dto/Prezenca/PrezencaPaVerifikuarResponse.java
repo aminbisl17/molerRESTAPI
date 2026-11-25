@@ -4,11 +4,11 @@ import java.time.LocalDate;
 import java.util.List;
 
 /**
- * Unverified ("nv") attendance of one worker for one day.
- * A single application creates one Prezenca_Puntoreve row per project,
- * so each project carries the id of its own prezenca row.
+ * Unverified ("nv") attendance of one worker for one day,
+ * with the projects worked on that day (prezenca_puntoreve_detajet).
  */
 public record PrezencaPaVerifikuarResponse(
+        Long idPrezences,
         Long idPuntorit,
         String emri,
         String mbiemri,
@@ -17,7 +17,6 @@ public record PrezencaPaVerifikuarResponse(
         List<ProjektiData> projektet
 ) {
     public record ProjektiData(
-            Long idPrezences,
             Long idProjektit,
             String emriProjektit,
             String kerkesa,

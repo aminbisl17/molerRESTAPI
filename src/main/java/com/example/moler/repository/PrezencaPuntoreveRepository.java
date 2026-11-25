@@ -8,15 +8,15 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
+@Repository
 public interface PrezencaPuntoreveRepository
         extends JpaRepository<prezencapuntoreve, Long> {
 
     List<prezencapuntoreve> findByDita(LocalDate dita);
 
     List<prezencapuntoreve> findByPuntoriId(Long puntoriId);
-
-    List<prezencapuntoreve> findByProjektiId(Long projektiId);
 
     List<prezencapuntoreve> findByStatusi(String statusi);
 
@@ -25,81 +25,74 @@ public interface PrezencaPuntoreveRepository
             String statusi
     );
 
-    List<prezencapuntoreve> findByProjektiIdAndDita(
-            Long projektiId,
-            LocalDate dita
-    );
-
-    boolean existsByProjektiIdAndPuntoriIdAndDita(
-            Long projektiId,
-            Long puntoriId,
-            LocalDate dita
-    );
-    
-    
-    @Query("""
-        SELECT MAX(p.dita)
-        FROM prezencapuntoreve p
-        WHERE p.puntori.id = :idPuntorit
-        AND p.projekti.statusi <> 'c'
-    """)
-   
-LocalDate findLatestDitaByPuntoriId(
-        @Param("idPuntorit") Long idPuntorit
-);
-
-@Query("""
-    SELECT p
-    FROM prezencapuntoreve p
-    WHERE p.puntori.id = :idPuntorit
-      AND p.dita = :dita
-      AND p.statusi = 'v'
-      AND p.projekti.statusi <> 'c'
-""")
-List<prezencapuntoreve> findLatestAttendanceByPuntoriId(
-        @Param("idPuntorit") Long idPuntorit,
-        @Param("dita") LocalDate dita
-);
-
-boolean existsByPuntori_IdAndDita(
-        Long idPuntorit,
-        LocalDate dita
-);
-
-    List<prezencapuntoreve> findAllByPuntori_IdAndDita(
+    boolean existsByPuntori_IdAndDita(
             Long idPuntorit,
             LocalDate dita
     );
 
-    // Unverified attendance on projects this manager is responsible for
+    // One attendance per worker per day
+    Optional<prezencapuntoreve> findByPuntori_IdAndDita(
+            Long idPuntorit,
+            LocalDate dita
+    );
+
+    // Latest attendance day that includes at least one non-completed project
     @Query("""
-        SELECT p
+        SELECT MAX(p.dita)
+        FROM prezencapuntoreve p
+        JOIN p.detajet d
+        WHERE p.puntori.id = :idPuntorit
+          AND d.projekti.statusi <> 'c'
+    """)
+    LocalDate findLatestDitaByPuntoriId(
+            @Param("idPuntorit") Long idPuntorit
+    );
+
+    // Project ids of the worker's VERIFIED attendance on the given day, excluding completed projects
+    @Query("""
+        SELECT DISTINCT d.projekti.id
+        FROM PrezencaPuntoreveDetajet d
+        WHERE d.prezenca.puntori.id = :idPuntorit
+          AND d.prezenca.dita = :dita
+          AND d.prezenca.statusi = 'v'
+          AND d.projekti.statusi <> 'c'
+    """)
+    List<Long> findLatestProjektetByPuntoriId(
+            @Param("idPuntorit") Long idPuntorit,
+            @Param("dita") LocalDate dita
+    );
+
+    // Unverified attendance that includes at least one project this manager is responsible for
+    @Query("""
+        SELECT DISTINCT p
         FROM prezencapuntoreve p
         JOIN FETCH p.puntori pu
-        JOIN FETCH p.projekti pr
+        JOIN FETCH p.detajet d
+        JOIN FETCH d.projekti
         WHERE p.statusi = 'nv'
           AND EXISTS (
               SELECT 1
-              FROM ProjektiPrezencaMenaxheret m
-              WHERE m.projekti = pr
+              FROM PrezencaPuntoreveDetajet d2, ProjektiPrezencaMenaxheret m
+              WHERE d2.prezenca = p
+                AND m.projekti = d2.projekti
                 AND m.menaxheri.id = :idMenaxherit
           )
-        ORDER BY p.dita DESC, pu.id, pr.id
+        ORDER BY p.dita DESC, pu.id
     """)
     List<prezencapuntoreve> findPaVerifikuaraByMenaxheriId(
             @Param("idMenaxherit") Long idMenaxherit
     );
 
-    // Of the given ids, the ones on projects this manager is responsible for
+    // Of the given ids, the attendance that includes at least one of this manager's projects
     @Query("""
         SELECT p
         FROM prezencapuntoreve p
-        JOIN FETCH p.projekti pr
         WHERE p.id IN :ids
           AND EXISTS (
               SELECT 1
-              FROM ProjektiPrezencaMenaxheret m
-              WHERE m.projekti = pr
+              FROM PrezencaPuntoreveDetajet d, ProjektiPrezencaMenaxheret m
+              WHERE d.prezenca = p
+                AND m.projekti = d.projekti
                 AND m.menaxheri.id = :idMenaxherit
           )
     """)

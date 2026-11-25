@@ -1,4 +1,3 @@
-
 package com.example.moler.service;
 
 import com.example.moler.dto.Prezenca.AplikoPrezenceRequest;
@@ -20,9 +19,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.Optional;
 
 @Service
 public class PrezencaService {
@@ -45,7 +43,7 @@ public class PrezencaService {
     }
 
     @Transactional
-    public List<prezencapuntoreve> aplikoPrezence(
+    public prezencapuntoreve aplikoPrezence(
             AplikoPrezenceRequest request,
             Long idPuntorit
     ) {
@@ -75,9 +73,15 @@ public class PrezencaService {
             throw new RuntimeException("Keni aplikuar tashme per sot");
         }
 
-        List<prezencapuntoreve> prezencat = new ArrayList<>();
+        // One attendance row for the day...
+        prezencapuntoreve prezenca = new prezencapuntoreve();
+        prezenca.setPuntori(puntori);
+        prezenca.setDita(dita);
+        prezenca.setLlojiOrarit(request.llojiOrarit());
+        prezenca.setStatusi("nv");
 
-        for (Long idProjekti : request.idProjektet()) {
+        // ...and one detail row per project (duplicates ignored)
+        for (Long idProjekti : request.idProjektet().stream().distinct().toList()) {
 
             if (idProjekti == null) {
                 throw new RuntimeException("ID e projektit nuk eshte valide");
@@ -88,18 +92,11 @@ public class PrezencaService {
                     .orElseThrow(() ->
                             new RuntimeException("Projekti nuk ekziston: " + idProjekti));
 
-            prezencapuntoreve prezenca = new prezencapuntoreve();
-
-            prezenca.setProjekti(projekti);
-            prezenca.setPuntori(puntori);
-            prezenca.setDita(dita);
-            prezenca.setLlojiOrarit(request.llojiOrarit());
-            prezenca.setStatusi("nv");
-
-            prezencat.add(prezenca);
+            prezenca.shtoProjekt(projekti);
         }
 
-        return prezencaRepository.saveAll(prezencat);
+        // Details are saved together with the attendance (cascade)
+        return prezencaRepository.save(prezenca);
     }
 
     @Transactional
@@ -111,23 +108,19 @@ public class PrezencaService {
 
         LocalDate dita = LocalDate.now(ZoneId.of("Europe/Skopje"));
 
-        List<prezencapuntoreve> prezencat =
-                prezencaRepository.findAllByPuntori_IdAndDita(idPuntorit, dita);
+        prezencapuntoreve prezenca = prezencaRepository
+                .findByPuntori_IdAndDita(idPuntorit, dita)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Nuk keni prezence per sot"));
 
-        if (prezencat.isEmpty()) {
-            throw new ResourceNotFoundException("Nuk keni prezence per sot");
-        }
-
-        // Only allow deletion if every record is still not verified
-        boolean kaVerifikuar = prezencat.stream()
-                .anyMatch(p -> !"nv".equals(p.getStatusi()));
-
-        if (kaVerifikuar) {
+        // Only allow deletion while still not verified
+        if (!"nv".equals(prezenca.getStatusi())) {
             throw new IllegalArgumentException(
                     "Prezenca eshte verifikuar dhe nuk mund te fshihet");
         }
 
-        prezencaRepository.deleteAll(prezencat);
+        // Details are removed together with the attendance (cascade)
+        prezencaRepository.delete(prezenca);
     }
 
     @Transactional
@@ -150,7 +143,7 @@ public class PrezencaService {
         List<prezencapuntoreve> prezencat =
                 prezencaRepository.findByIdInAndMenaxheriId(ids, idMenaxherit);
 
-        // Every id must exist and belong to one of this manager's projects
+        // Every id must exist and include at least one of this manager's projects
         if (prezencat.size() != ids.size()) {
             List<Long> gjetura = prezencat.stream()
                     .map(prezencapuntoreve::getId)
@@ -183,37 +176,29 @@ public class PrezencaService {
             throw new IllegalArgumentException("Menaxheri eshte i detyrueshem");
         }
 
-        List<prezencapuntoreve> prezencat =
-                prezencaRepository.findPaVerifikuaraByMenaxheriId(idMenaxherit);
-
-        // Group rows by worker + day (one application = one row per project)
-        Map<String, List<prezencapuntoreve>> grupet = new LinkedHashMap<>();
-        for (prezencapuntoreve p : prezencat) {
-            String key = p.getPuntori().getId() + "_" + p.getDita();
-            grupet.computeIfAbsent(key, k -> new ArrayList<>()).add(p);
-        }
-
-        return grupet.values().stream()
-                .map(rows -> {
-                    puntori pu = rows.get(0).getPuntori();
+        return prezencaRepository.findPaVerifikuaraByMenaxheriId(idMenaxherit)
+                .stream()
+                .map(p -> {
+                    puntori pu = p.getPuntori();
 
                     List<PrezencaPaVerifikuarResponse.ProjektiData> projektet =
-                            rows.stream()
-                                    .map(r -> new PrezencaPaVerifikuarResponse.ProjektiData(
-                                            r.getId(),
-                                            r.getProjekti().getId(),
-                                            r.getProjekti().getEmri(),
-                                            r.getProjekti().getKerkesa(),
-                                            r.getProjekti().getAmbienti()
+                            p.getDetajet().stream()
+                                    .map(d -> d.getProjekti())
+                                    .map(pr -> new PrezencaPaVerifikuarResponse.ProjektiData(
+                                            pr.getId(),
+                                            pr.getEmri(),
+                                            pr.getKerkesa(),
+                                            pr.getAmbienti()
                                     ))
                                     .toList();
 
                     return new PrezencaPaVerifikuarResponse(
+                            p.getId(),
                             pu.getId(),
                             pu.getEmri(),
                             pu.getMbiemri(),
                             pu.getPozita(),
-                            rows.get(0).getDita(),
+                            p.getDita(),
                             projektet
                     );
                 })
@@ -230,35 +215,26 @@ public class PrezencaService {
         LocalDate sot = LocalDate.now(ZoneId.of("Europe/Skopje"));
 
         // Check whether the worker has already applied today
-        List<prezencapuntoreve> prezencatESotme =
-                prezencaRepository.findAllByPuntori_IdAndDita(
-                        idPuntorit, sot
-                );
+        Optional<prezencapuntoreve> prezencaESotme =
+                prezencaRepository.findByPuntori_IdAndDita(idPuntorit, sot);
 
-        boolean kaAplikuarSot = !prezencatESotme.isEmpty();
+        boolean kaAplikuarSot = prezencaESotme.isPresent();
 
-        // "nv" only if every record today is still not verified, otherwise "v"
-        String statusi = null;
-        if (kaAplikuarSot) {
-            statusi = prezencatESotme.stream()
-                    .allMatch(p -> "nv".equals(p.getStatusi()))
-                    ? "nv"
-                    : "v";
-        }
+        // Today's status: "nv", "v", or null if not applied
+        String statusi = prezencaESotme
+                .map(prezencapuntoreve::getStatusi)
+                .orElse(null);
 
-        // Find latest VERIFIED attendance date, excluding completed projects
+        // Find latest attendance date, excluding completed projects
         LocalDate ditaFundit =
                 prezencaRepository.findLatestDitaByPuntoriId(idPuntorit);
 
         List<Long> projektetEFundit = new ArrayList<>();
 
         if (ditaFundit != null) {
+            // Projects of that day, only if it was verified
             projektetEFundit = prezencaRepository
-                    .findLatestAttendanceByPuntoriId(idPuntorit, ditaFundit)
-                    .stream()
-                    .map(p -> p.getProjekti().getId())
-                    .distinct()
-                    .toList();
+                    .findLatestProjektetByPuntoriId(idPuntorit, ditaFundit);
         }
 
         // Get all projects assigned to this worker, excluding completed projects

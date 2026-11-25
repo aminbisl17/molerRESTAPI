@@ -4,7 +4,6 @@ import com.example.moler.authentication.JwtUtil;
 import com.example.moler.dto.Prezenca.AplikoPrezenceRequest;
 import com.example.moler.dto.Prezenca.PrezencaFormDataResponse;
 import com.example.moler.dto.Prezenca.VerifikoPrezenceRequest;
-import com.example.moler.model.prezencapuntoreve;
 import com.example.moler.service.PrezencaService;
 
 import org.springframework.http.HttpStatus;
@@ -43,8 +42,7 @@ public ResponseEntity<?> aplikoPrezence(
     Long puntoriId = jwtUtil.extractId(token);
 
     // Apply for attendance
-    List<prezencapuntoreve> prezencat =
-            prezencaService.aplikoPrezence(request, puntoriId);
+    prezencaService.aplikoPrezence(request, puntoriId);
 
     return ResponseEntity.noContent().build();
 }
