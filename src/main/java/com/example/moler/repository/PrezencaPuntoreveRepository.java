@@ -42,21 +42,24 @@ public interface PrezencaPuntoreveRepository
         WHERE p.puntori.id = :idPuntorit
         AND p.projekti.statusi <> 'c'
     """)
-    LocalDate findLatestDitaByPuntoriId(
-            @Param("idPuntorit") Long idPuntorit
-    );
+   
+LocalDate findLatestDitaByPuntoriId(
+        @Param("idPuntorit") Long idPuntorit
+);
 
-    @Query("""
-        SELECT p
-        FROM prezencapuntoreve p
-        WHERE p.puntori.id = :idPuntorit
-        AND p.dita = :dita
-        AND p.projekti.statusi <> 'c'
-    """)
-    List<prezencapuntoreve> findLatestAttendanceByPuntoriId(
-            @Param("idPuntorit") Long idPuntorit,
-            @Param("dita") LocalDate dita
-    );
+@Query("""
+    SELECT p
+    FROM prezencapuntoreve p
+    WHERE p.puntori.id = :idPuntorit
+      AND p.dita = :dita
+      AND p.statusi = 'v'
+      AND p.projekti.statusi <> 'c'
+""")
+List<prezencapuntoreve> findLatestAttendanceByPuntoriId(
+        @Param("idPuntorit") Long idPuntorit,
+        @Param("dita") LocalDate dita
+);
+
     List<prezencapuntoreve> findAllByPuntori_IdAndDita(
             Long idPuntorit,
             LocalDate dita
