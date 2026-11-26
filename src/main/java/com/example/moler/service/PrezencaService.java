@@ -26,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -194,6 +195,14 @@ public class PrezencaService {
         List<prezencapuntoreve> prezencat =
                 gjejPrezencatPerMenaxherin(idPrezencave, idMenaxherit, false);
 
+        // Notify before deleting, while worker and date are still loaded (sent after commit)
+        prezencat.forEach(p -> njoftoPuntorin(
+                p,
+                "prezenca_fshire",
+                "Prezenca u fshi",
+                "Prezenca juaj per " + formatoDiten(p) + " u fshi nga menaxheri."
+        ));
+
         // Details are removed together with the attendance (cascade)
         prezencaRepository.deleteAll(prezencat);
     }
@@ -308,6 +317,13 @@ public class PrezencaService {
 
         prezencat.forEach(p -> p.setStatusi("v"));
         prezencaRepository.saveAll(prezencat);
+
+        prezencat.forEach(p -> njoftoPuntorin(
+                p,
+                "prezenca_verifikuar",
+                "Prezenca u verifikua",
+                "Prezenca juaj per " + formatoDiten(p) + " u verifikua."
+        ));
     }
 
     @Transactional
@@ -332,6 +348,51 @@ public class PrezencaService {
             p.setDataAnulimit(tani);
         });
         prezencaRepository.saveAll(prezencat);
+
+        String pjesaArsyes = arsyeja == null ? "" : " Arsyeja: " + arsyeja;
+
+        prezencat.forEach(p -> njoftoPuntorin(
+                p,
+                "prezenca_anuluar",
+                "Prezenca u anulua",
+                "Prezenca juaj per " + formatoDiten(p) + " u anulua." + pjesaArsyes
+        ));
+    }
+
+    private static final DateTimeFormatter FORMATI_DITES = DateTimeFormatter.ofPattern("dd.MM.yyyy");
+
+    private String formatoDiten(prezencapuntoreve p) {
+        return p.getDita() == null ? "" : p.getDita().format(FORMATI_DITES);
+    }
+
+    /**
+     * Tells the worker that a manager changed their attendance.
+     * Sent after commit; a notification problem never fails the manager's action.
+     */
+    private void njoftoPuntorin(
+            prezencapuntoreve prezenca,
+            String tipi,
+            String titulli,
+            String mesazhi
+    ) {
+        try {
+            Long idPuntorit = prezenca.getPuntori().getId();
+
+            notificationService.dergo(
+                    List.of(Marresi.puntor(idPuntorit)),
+                    titulli,
+                    // Notification body limit; a long cancel reason is shortened
+                    mesazhi.length() > 500 ? mesazhi.substring(0, 497) + "..." : mesazhi,
+                    Map.of(
+                            "tipi", tipi,
+                            "idPrezences", prezenca.getId(),
+                            "dita", prezenca.getDita().toString()
+                    )
+            );
+        } catch (Exception e) {
+            log.warn("Could not notify worker about attendance {}: {}",
+                    prezenca.getId(), e.getMessage());
+        }
     }
 
     /**
