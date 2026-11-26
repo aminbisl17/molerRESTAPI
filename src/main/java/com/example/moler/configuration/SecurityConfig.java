@@ -165,6 +165,8 @@ public class SecurityConfig {
                 ).hasRole("MENAXHER")
 
                 .requestMatchers("/prezenca/**").hasAnyRole("PUNTOR", "MENAXHER")
+
+                .requestMatchers("/push-token").hasAnyRole("PUNTOR", "MENAXHER")
                 // EVERYTHING ELSE
                 .anyRequest().authenticated()
             )
