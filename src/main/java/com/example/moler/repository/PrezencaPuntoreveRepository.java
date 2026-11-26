@@ -83,6 +83,31 @@ public interface PrezencaPuntoreveRepository
             @Param("idMenaxherit") Long idMenaxherit
     );
 
+    // Number of unverified attendance that includes at least one of this manager's projects
+    @Query("""
+        SELECT COUNT(p)
+        FROM prezencapuntoreve p
+        WHERE p.statusi = 'nv'
+          AND EXISTS (
+              SELECT 1
+              FROM PrezencaPuntoreveDetajet d, ProjektiPrezencaMenaxheret m
+              WHERE d.prezenca = p
+                AND m.projekti = d.projekti
+                AND m.menaxheri.id = :idMenaxherit
+          )
+    """)
+    long countPaVerifikuaraByMenaxheriId(
+            @Param("idMenaxherit") Long idMenaxherit
+    );
+
+    // A worker's attendance in one status between two days (inclusive)
+    List<prezencapuntoreve> findByPuntori_IdAndStatusiAndDitaBetween(
+            Long idPuntorit,
+            String statusi,
+            LocalDate nga,
+            LocalDate deri
+    );
+
     // All attendance (any status) that includes at least one of this manager's projects
     @Query("""
         SELECT DISTINCT p

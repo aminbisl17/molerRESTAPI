@@ -24,6 +24,8 @@ public interface PuntoriRepository extends JpaRepository<puntori, Long> {
 
     List<puntori> findByStatusi(String statusi);
 
+    long countByStatusi(String statusi);
+
     List<puntori> findByPozita(String pozita);
 
     List<puntori> findByStatusiAndPozita(String statusi, String pozita);

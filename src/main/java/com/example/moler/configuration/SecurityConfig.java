@@ -145,6 +145,7 @@ public class SecurityConfig {
                 // MENAXHER ENDPOINTS
                 .requestMatchers(
                         "/menaxheri/data",
+                        "/menaxheri/dashboard",
                         "/menaxheri/puntori/**",
                         "/projekti/**"
                 ).hasRole("MENAXHER")

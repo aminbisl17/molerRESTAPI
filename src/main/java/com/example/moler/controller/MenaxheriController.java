@@ -8,6 +8,7 @@ import com.example.moler.model.menaxheri;
 import com.example.moler.model.puntori;
 import com.example.moler.repository.MenaxheriRepository;
 import com.example.moler.repository.PuntoriRepository;
+import com.example.moler.service.DashboardService;
 import com.example.moler.dto.MenaxheriDTO.UpdateMenaxheriDTO;
 import com.example.moler.dto.MenaxheriDTO.UpdatePuntoriDTO;
 import com.example.moler.dto.PuntoriDTO.PuntoriResponseDTO;
@@ -32,6 +33,8 @@ public class MenaxheriController {
 
     private final PuntoriRepository puntoriRepository;
 
+    private final DashboardService dashboardService;
+
 
     @Autowired
     private BCryptPasswordEncoder passwordEncoder;
@@ -39,11 +42,42 @@ public class MenaxheriController {
 public MenaxheriController(
         MenaxheriRepository menaxheriRepository,
         PuntoriRepository puntoriRepository,
-        JwtUtil jwtUtil) {
+        JwtUtil jwtUtil,
+        DashboardService dashboardService) {
 
     this.menaxheriRepository = menaxheriRepository;
     this.puntoriRepository = puntoriRepository;
     this.jwtUtil = jwtUtil;
+    this.dashboardService = dashboardService;
+}
+
+// --------------------------------------------------
+// MENAXHERI DASHBOARD
+// GET /menaxheri/dashboard
+// --------------------------------------------------
+
+@GetMapping("/dashboard")
+public ResponseEntity<?> getDashboard(
+        @RequestHeader("Authorization") String authorization) {
+
+    if (authorization == null || !authorization.startsWith("Bearer ")) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(Map.of("message", "Access token is missing"));
+    }
+
+    String token = authorization.substring(7);
+
+    if (!"ROLE_MENAXHER".equals(jwtUtil.extractRole(token))) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("message", "Nevoitet qasja e menaxherit"));
+    }
+
+    // Extract manager ID from JWT
+    Long menaxheriId = jwtUtil.extractId(token);
+
+    return ResponseEntity.ok(
+            dashboardService.getMenaxheriDashboard(menaxheriId)
+    );
 }
 
     // --------------------------------------------------

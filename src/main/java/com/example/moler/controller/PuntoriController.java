@@ -7,6 +7,7 @@ import com.example.moler.dto.PuntoriDTO.PuntoriResponseDTO;
 import com.example.moler.dto.PuntoriDTO.UpdatePuntoriDTO;
 import com.example.moler.model.puntori;
 import com.example.moler.repository.PuntoriRepository;
+import com.example.moler.service.DashboardService;
 
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -25,15 +26,44 @@ public class PuntoriController {
     private final PuntoriRepository puntoriRepository;
     private final BCryptPasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
+    private final DashboardService dashboardService;
 
     public PuntoriController(
             PuntoriRepository puntoriRepository,
             BCryptPasswordEncoder passwordEncoder,
-            JwtUtil jwtUtil
+            JwtUtil jwtUtil,
+            DashboardService dashboardService
     ) {
         this.puntoriRepository = puntoriRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtUtil = jwtUtil;
+        this.dashboardService = dashboardService;
+    }
+
+    // GET /puntori/dashboard
+    @GetMapping("/dashboard")
+    public ResponseEntity<?> getDashboard(
+            @RequestHeader("Authorization") String authorization
+    ) {
+
+        if (authorization == null || !authorization.startsWith("Bearer ")) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("message", "Nevoitet tokeni i autorizuar"));
+        }
+
+        String token = authorization.substring(7);
+
+        if (!"ROLE_PUNTOR".equals(jwtUtil.extractRole(token))) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("message", "Nevoitet qasja e punonjësit"));
+        }
+
+        // Extract worker ID from JWT
+        Long puntoriId = jwtUtil.extractId(token);
+
+        return ResponseEntity.ok(
+                dashboardService.getPuntoriDashboard(puntoriId)
+        );
     }
 
     @PostMapping("/login")

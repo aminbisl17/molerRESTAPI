@@ -14,6 +14,8 @@ public interface ProjektiRepository extends JpaRepository<projekti, Long> {
 
     List<projekti> findByStatusi(String statusi);
 
+    long countByStatusiIn(List<String> statuset);
+
     List<projekti> findByPrioriteti(String prioriteti);
 
     List<projekti> findByStatusiProjektit(String statusiProjektit);
