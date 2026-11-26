@@ -4,6 +4,7 @@ import com.example.moler.authentication.JwtUtil;
 import com.example.moler.dto.Prezenca.AnuloPrezenceRequest;
 import com.example.moler.dto.Prezenca.AplikoPrezenceRequest;
 import com.example.moler.dto.Prezenca.FshiPrezenceRequest;
+import com.example.moler.dto.Prezenca.PerditesoPrezenceRequest;
 import com.example.moler.dto.Prezenca.PrezencaFormDataResponse;
 import com.example.moler.dto.Prezenca.VerifikoPrezenceRequest;
 import com.example.moler.service.PrezencaService;
@@ -146,6 +147,33 @@ public ResponseEntity<?> anuloPrezencat(
             request.arsyejaAnulimit(),
             menaxheriId
     );
+
+    return ResponseEntity.noContent().build();
+}
+
+@PatchMapping("/{id}")
+public ResponseEntity<?> perditesoPrezencen(
+        @RequestHeader("Authorization") String authorization,
+        @PathVariable Long id,
+        @RequestBody PerditesoPrezenceRequest request) {
+
+    if (authorization == null || !authorization.startsWith("Bearer ")) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(Map.of("message", "Access token is missing"));
+    }
+
+    String token = authorization.substring(7);
+
+    // Only managers can edit attendance
+    if (!"ROLE_MENAXHER".equals(jwtUtil.extractRole(token))) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("message", "Nevoitet qasja e menaxherit"));
+    }
+
+    // Extract manager ID from JWT
+    Long menaxheriId = jwtUtil.extractId(token);
+
+    prezencaService.perditesoPrezencen(id, request, menaxheriId);
 
     return ResponseEntity.noContent().build();
 }

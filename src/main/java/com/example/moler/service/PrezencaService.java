@@ -1,6 +1,7 @@
 package com.example.moler.service;
 
 import com.example.moler.dto.Prezenca.AplikoPrezenceRequest;
+import com.example.moler.dto.Prezenca.PerditesoPrezenceRequest;
 import com.example.moler.dto.Prezenca.PrezencaFormDataResponse;
 import com.example.moler.dto.Prezenca.PrezencaPaVerifikuarResponse;
 import com.example.moler.exception.ResourceNotFoundException;
@@ -20,7 +21,10 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.Optional;
 
 @Service
@@ -133,6 +137,108 @@ public class PrezencaService {
 
         // Details are removed together with the attendance (cascade)
         prezencaRepository.deleteAll(prezencat);
+    }
+
+    @Transactional
+    public void perditesoPrezencen(
+            Long idPrezences,
+            PerditesoPrezenceRequest request,
+            Long idMenaxherit
+    ) {
+
+        if (request == null) {
+            throw new IllegalArgumentException("Te dhenat per perditesim mungojne");
+        }
+
+        // Any status can be edited, but only on the manager's projects
+        prezencapuntoreve prezenca =
+                gjejPrezencatPerMenaxherin(List.of(idPrezences), idMenaxherit, false).get(0);
+
+        String statusiIVjeter = prezenca.getStatusi();
+
+        String statusiIRi = request.statusi() == null
+                ? statusiIVjeter
+                : request.statusi().trim();
+
+        if (!List.of("nv", "v", "c").contains(statusiIRi)) {
+            throw new IllegalArgumentException("Statusi duhet te jete nv, v ose c");
+        }
+
+        if (request.llojiOrarit() != null) {
+            String lloji = request.llojiOrarit().trim();
+
+            if (!"h".equals(lloji) && !"f".equals(lloji)) {
+                throw new IllegalArgumentException("Lloji i orarit duhet te jete h ose f");
+            }
+
+            prezenca.setLlojiOrarit(lloji);
+        }
+
+        if (request.idProjektet() != null) {
+            perditesoProjektet(prezenca, request.idProjektet());
+        }
+
+        if ("c".equals(statusiIRi)) {
+            // Keep the existing reason unless a new one is sent
+            if (request.arsyejaAnulimit() != null) {
+                String arsyeja = request.arsyejaAnulimit().trim();
+                prezenca.setArsyejaAnulimit(arsyeja.isEmpty() ? null : arsyeja);
+            }
+
+            // Stamp the cancellation date only when it becomes canceled
+            if (!"c".equals(statusiIVjeter) || prezenca.getDataAnulimit() == null) {
+                prezenca.setDataAnulimit(LocalDateTime.now(ZoneId.of("Europe/Skopje")));
+            }
+        } else {
+            if (request.arsyejaAnulimit() != null && !request.arsyejaAnulimit().isBlank()) {
+                throw new IllegalArgumentException(
+                        "Arsyeja e anulimit lejohet vetem kur statusi eshte c");
+            }
+
+            prezenca.setArsyejaAnulimit(null);
+            prezenca.setDataAnulimit(null);
+        }
+
+        prezenca.setStatusi(statusiIRi);
+        prezencaRepository.save(prezenca);
+    }
+
+    /**
+     * Replaces the attendance projects, touching only the rows that change
+     * so unchanged projects are not deleted and re-inserted.
+     */
+    private void perditesoProjektet(prezencapuntoreve prezenca, List<Long> idProjektet) {
+
+        if (idProjektet.isEmpty()) {
+            throw new IllegalArgumentException("Duhet te zgjidhni te pakten nje projekt");
+        }
+
+        if (idProjektet.stream().anyMatch(id -> id == null)) {
+            throw new IllegalArgumentException("ID e projektit nuk eshte valide");
+        }
+
+        Set<Long> teRinjte = new LinkedHashSet<>(idProjektet);
+
+        // Remove projects that are no longer selected (orphanRemoval deletes the rows)
+        prezenca.getDetajet().removeIf(d ->
+                !teRinjte.contains(d.getProjekti().getId()));
+
+        Set<Long> ekzistuese = new HashSet<>();
+        prezenca.getDetajet().forEach(d -> ekzistuese.add(d.getProjekti().getId()));
+
+        // Add the newly selected projects
+        for (Long idProjekti : teRinjte) {
+            if (ekzistuese.contains(idProjekti)) {
+                continue;
+            }
+
+            projekti projekti = projektiRepository
+                    .findById(idProjekti)
+                    .orElseThrow(() ->
+                            new ResourceNotFoundException("Projekti nuk ekziston: " + idProjekti));
+
+            prezenca.shtoProjekt(projekti);
+        }
     }
 
     @Transactional

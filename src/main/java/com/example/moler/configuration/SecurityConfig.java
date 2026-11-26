@@ -154,6 +154,9 @@ public class SecurityConfig {
                         "/puntori/**"
                 ).hasRole("PUNTOR")
 
+                // Editing attendance (/prezenca/{id}, /v, /c) is manager-only
+                .requestMatchers(HttpMethod.PATCH, "/prezenca/**").hasRole("MENAXHER")
+
                 .requestMatchers("/prezenca/**").hasAnyRole("PUNTOR", "MENAXHER")
                 // EVERYTHING ELSE
                 .anyRequest().authenticated()
