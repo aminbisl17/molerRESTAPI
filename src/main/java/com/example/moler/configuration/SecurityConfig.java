@@ -146,6 +146,7 @@ public class SecurityConfig {
                 .requestMatchers(
                         "/menaxheri/data",
                         "/menaxheri/dashboard",
+                        "/notifications/**",
                         "/menaxheri/puntori/**",
                         "/projekti/**"
                 ).hasRole("MENAXHER")

@@ -11,7 +11,12 @@ import com.example.moler.model.prezencapuntoreve;
 import com.example.moler.model.projekti;
 import com.example.moler.model.puntori;
 import com.example.moler.repository.PrezencaPuntoreveRepository;
+import com.example.moler.repository.ProjektiPrezencaMenaxheretRepository;
 import com.example.moler.repository.ProjektiPrezencaPuntoretRepository;
+import com.example.moler.dto.Notification.Marresi;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.example.moler.repository.ProjektiRepository;
 import com.example.moler.repository.PuntoriRepository;
 
@@ -25,6 +30,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.Optional;
 
@@ -35,17 +41,25 @@ public class PrezencaService {
     private final ProjektiRepository projektiRepository;
     private final PuntoriRepository puntoriRepository;
     private final ProjektiPrezencaPuntoretRepository projektiPrezencaRepository;
+    private final ProjektiPrezencaMenaxheretRepository projektiMenaxheretRepository;
+    private final NotificationService notificationService;
+
+    private static final Logger log = LoggerFactory.getLogger(PrezencaService.class);
 
     public PrezencaService(
             PrezencaPuntoreveRepository prezencaRepository,
             ProjektiRepository projektiRepository,
             PuntoriRepository puntoriRepository,
-            ProjektiPrezencaPuntoretRepository projektiPrezencaRepository
+            ProjektiPrezencaPuntoretRepository projektiPrezencaRepository,
+            ProjektiPrezencaMenaxheretRepository projektiMenaxheretRepository,
+            NotificationService notificationService
     ) {
         this.prezencaRepository = prezencaRepository;
         this.projektiRepository = projektiRepository;
         this.puntoriRepository = puntoriRepository;
         this.projektiPrezencaRepository = projektiPrezencaRepository;
+        this.projektiMenaxheretRepository = projektiMenaxheretRepository;
+        this.notificationService = notificationService;
     }
 
     @Transactional
@@ -86,8 +100,10 @@ public class PrezencaService {
         prezenca.setLlojiOrarit(request.llojiOrarit());
         prezenca.setStatusi("nv");
 
+        List<Long> idProjektet = request.idProjektet().stream().distinct().toList();
+
         // ...and one detail row per project (duplicates ignored)
-        for (Long idProjekti : request.idProjektet().stream().distinct().toList()) {
+        for (Long idProjekti : idProjektet) {
 
             if (idProjekti == null) {
                 throw new RuntimeException("ID e projektit nuk eshte valide");
@@ -102,7 +118,49 @@ public class PrezencaService {
         }
 
         // Details are saved together with the attendance (cascade)
-        return prezencaRepository.save(prezenca);
+        prezencapuntoreve ruajtur = prezencaRepository.save(prezenca);
+
+        njoftoMenaxheret(ruajtur, puntori, idProjektet);
+
+        return ruajtur;
+    }
+
+    /**
+     * Notifies the managers of the selected projects about the new attendance.
+     * Sent after commit; a notification problem never fails the application.
+     */
+    private void njoftoMenaxheret(
+            prezencapuntoreve prezenca,
+            puntori puntori,
+            List<Long> idProjektet
+    ) {
+        try {
+            List<Marresi> menaxheret = projektiMenaxheretRepository
+                    .findMenaxheriIdsByProjektiIds(idProjektet)
+                    .stream()
+                    .map(Marresi::menaxher)
+                    .toList();
+
+            if (menaxheret.isEmpty()) {
+                return;
+            }
+
+            String orari = "h".equals(prezenca.getLlojiOrarit()) ? "gjysme dite" : "dite e plote";
+
+            notificationService.dergo(
+                    menaxheret,
+                    "Prezence e re per verifikim",
+                    puntori.getEmri() + " " + puntori.getMbiemri()
+                            + " aplikoi per prezence sot (" + orari + ").",
+                    Map.of(
+                            "tipi", "prezenca_e_re",
+                            "idPrezences", prezenca.getId()
+                    )
+            );
+        } catch (Exception e) {
+            log.warn("Could not notify managers about attendance {}: {}",
+                    prezenca.getId(), e.getMessage());
+        }
     }
 
     @Transactional
