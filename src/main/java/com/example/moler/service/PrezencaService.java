@@ -125,6 +125,17 @@ public class PrezencaService {
     }
 
     @Transactional
+    public void fshiPrezencat(List<Long> idPrezencave, Long idMenaxherit) {
+
+        // Managers may delete attendance in any status, but only on their projects
+        List<prezencapuntoreve> prezencat =
+                gjejPrezencatPerMenaxherin(idPrezencave, idMenaxherit, false);
+
+        // Details are removed together with the attendance (cascade)
+        prezencaRepository.deleteAll(prezencat);
+    }
+
+    @Transactional
     public void verifikoPrezencat(List<Long> idPrezencave, Long idMenaxherit) {
 
         List<prezencapuntoreve> prezencat =
@@ -166,6 +177,14 @@ public class PrezencaService {
             List<Long> idPrezencave,
             Long idMenaxherit
     ) {
+        return gjejPrezencatPerMenaxherin(idPrezencave, idMenaxherit, true);
+    }
+
+    private List<prezencapuntoreve> gjejPrezencatPerMenaxherin(
+            List<Long> idPrezencave,
+            Long idMenaxherit,
+            boolean vetemNv
+    ) {
 
         if (idMenaxherit == null) {
             throw new IllegalArgumentException("Menaxheri eshte i detyrueshem");
@@ -194,6 +213,10 @@ public class PrezencaService {
                     .toList();
             throw new ResourceNotFoundException(
                     "Prezencat nuk u gjeten ose nuk jane ne projektet tuaja: " + mungojne);
+        }
+
+        if (!vetemNv) {
+            return prezencat;
         }
 
         // Only attendance that is still not verified can be verified or canceled

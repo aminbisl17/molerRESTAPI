@@ -3,6 +3,7 @@ package com.example.moler.controller;
 import com.example.moler.authentication.JwtUtil;
 import com.example.moler.dto.Prezenca.AnuloPrezenceRequest;
 import com.example.moler.dto.Prezenca.AplikoPrezenceRequest;
+import com.example.moler.dto.Prezenca.FshiPrezenceRequest;
 import com.example.moler.dto.Prezenca.PrezencaFormDataResponse;
 import com.example.moler.dto.Prezenca.VerifikoPrezenceRequest;
 import com.example.moler.service.PrezencaService;
@@ -151,7 +152,8 @@ public ResponseEntity<?> anuloPrezencat(
 
 @DeleteMapping
 public ResponseEntity<?> fshiPrezencen(
-        @RequestHeader("Authorization") String authorization) {
+        @RequestHeader("Authorization") String authorization,
+        @RequestBody(required = false) FshiPrezenceRequest request) {
 
     if (authorization == null || !authorization.startsWith("Bearer ")) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
@@ -159,6 +161,18 @@ public ResponseEntity<?> fshiPrezencen(
     }
 
     String token = authorization.substring(7);
+
+    // Managers delete the given attendance ids from their own projects
+    if ("ROLE_MENAXHER".equals(jwtUtil.extractRole(token))) {
+        Long menaxheriId = jwtUtil.extractId(token);
+
+        prezencaService.fshiPrezencat(
+                request == null ? null : request.idPrezencave(),
+                menaxheriId
+        );
+
+        return ResponseEntity.noContent().build();
+    }
 
     // Extract worker ID from JWT
     Long puntoriId = jwtUtil.extractId(token);
