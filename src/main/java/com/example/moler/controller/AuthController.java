@@ -364,7 +364,7 @@ public ResponseEntity<?> verifyEnrollmentCode(
                 c.CodeHash,
                 a.Username,
                 a.TenantId,
-                a.CompanyName
+                a.company_name AS CompanyName
             FROM dbo.companyauth_codes c
             INNER JOIN dbo.companyauth a
                 ON a.Id = c.CompanyAuthId
@@ -543,7 +543,7 @@ public ResponseEntity<?> registerCompany(
             """
             INSERT INTO dbo.companyauth (
                 TenantId,
-                CompanyName,
+                company_name,
                 Username,
                 Password
             )
