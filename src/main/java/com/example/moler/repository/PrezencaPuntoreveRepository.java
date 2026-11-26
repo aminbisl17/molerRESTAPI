@@ -127,6 +127,22 @@ public interface PrezencaPuntoreveRepository
             @Param("statuset") List<String> statuset
     );
 
+    // One worker's attendance in the given statuses, across all projects
+    @Query("""
+        SELECT DISTINCT p
+        FROM prezencapuntoreve p
+        JOIN FETCH p.puntori pu
+        JOIN FETCH p.detajet d
+        JOIN FETCH d.projekti
+        WHERE pu.id = :idPuntorit
+          AND p.statusi IN :statuset
+        ORDER BY p.dita DESC
+    """)
+    List<prezencapuntoreve> findByPuntoriIdAndStatusiIn(
+            @Param("idPuntorit") Long idPuntorit,
+            @Param("statuset") List<String> statuset
+    );
+
     // Of the given ids, the attendance that includes at least one of this manager's projects
     @Query("""
         SELECT p

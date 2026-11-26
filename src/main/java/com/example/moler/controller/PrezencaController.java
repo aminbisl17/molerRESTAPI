@@ -106,19 +106,30 @@ public ResponseEntity<?> getPrezencatEPuntorit(
     }
 
     String token = authorization.substring(7);
+    String role = jwtUtil.extractRole(token);
+    Long idNgaTokeni = jwtUtil.extractId(token);
 
-    // Only managers can see a worker's attendance
-    if (!"ROLE_MENAXHER".equals(jwtUtil.extractRole(token))) {
-        return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(Map.of("message", "Nevoitet qasja e menaxherit"));
+    // Managers see the worker's attendance on their own projects
+    if ("ROLE_MENAXHER".equals(role)) {
+        return ResponseEntity.ok(
+                prezencaService.getPrezencatEPuntorit(idPuntorit, idNgaTokeni)
+        );
     }
 
-    // Extract manager ID from JWT
-    Long menaxheriId = jwtUtil.extractId(token);
+    // Workers can only see their own attendance
+    if ("ROLE_PUNTOR".equals(role)) {
+        if (!idPuntorit.equals(idNgaTokeni)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("message", "Mund te shihni vetem prezencat tuaja"));
+        }
 
-    return ResponseEntity.ok(
-            prezencaService.getPrezencatEPuntorit(idPuntorit, menaxheriId)
-    );
+        return ResponseEntity.ok(
+                prezencaService.getPrezencatEPuntorit(idPuntorit, null)
+        );
+    }
+
+    return ResponseEntity.status(HttpStatus.FORBIDDEN)
+            .body(Map.of("message", "Nuk keni qasje"));
 }
 
 @GetMapping("/nv")

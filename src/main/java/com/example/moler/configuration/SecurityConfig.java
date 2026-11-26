@@ -160,8 +160,7 @@ public class SecurityConfig {
                 // Listing attendance is manager-only
                 .requestMatchers(HttpMethod.GET,
                         "/prezenca",
-                        "/prezenca/nv",
-                        "/prezenca/puntori/**"
+                        "/prezenca/nv"
                 ).hasRole("MENAXHER")
 
                 .requestMatchers("/prezenca/**").hasAnyRole("PUNTOR", "MENAXHER")

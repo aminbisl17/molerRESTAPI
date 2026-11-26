@@ -390,22 +390,26 @@ public class PrezencaService {
                 .toList();
     }
 
+    /**
+     * A worker's verified and unverified attendance (canceled is excluded).
+     * With a manager id, only attendance on that manager's projects is returned;
+     * with null (the worker viewing their own), all of it is.
+     */
     @Transactional(readOnly = true)
     public List<PrezencaResponse> getPrezencatEPuntorit(Long idPuntorit, Long idMenaxherit) {
-
-        if (idMenaxherit == null) {
-            throw new IllegalArgumentException("Menaxheri eshte i detyrueshem");
-        }
 
         if (!puntoriRepository.existsById(idPuntorit)) {
             throw new ResourceNotFoundException("Puntori nuk ekziston: " + idPuntorit);
         }
 
-        // Verified and unverified only; canceled attendance is excluded
-        return prezencaRepository
-                .findByPuntoriIdAndMenaxheriIdAndStatusiIn(
-                        idPuntorit, idMenaxherit, List.of("nv", "v"))
-                .stream()
+        List<String> statuset = List.of("nv", "v");
+
+        List<prezencapuntoreve> prezencat = idMenaxherit == null
+                ? prezencaRepository.findByPuntoriIdAndStatusiIn(idPuntorit, statuset)
+                : prezencaRepository.findByPuntoriIdAndMenaxheriIdAndStatusiIn(
+                        idPuntorit, idMenaxherit, statuset);
+
+        return prezencat.stream()
                 .map(this::toPrezencaResponse)
                 .toList();
     }
