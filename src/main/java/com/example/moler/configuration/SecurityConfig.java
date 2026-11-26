@@ -157,6 +157,13 @@ public class SecurityConfig {
                 // Editing attendance (/prezenca/{id}, /v, /c) is manager-only
                 .requestMatchers(HttpMethod.PATCH, "/prezenca/**").hasRole("MENAXHER")
 
+                // Listing attendance is manager-only
+                .requestMatchers(HttpMethod.GET,
+                        "/prezenca",
+                        "/prezenca/nv",
+                        "/prezenca/puntori/**"
+                ).hasRole("MENAXHER")
+
                 .requestMatchers("/prezenca/**").hasAnyRole("PUNTOR", "MENAXHER")
                 // EVERYTHING ELSE
                 .anyRequest().authenticated()

@@ -83,6 +83,50 @@ public interface PrezencaPuntoreveRepository
             @Param("idMenaxherit") Long idMenaxherit
     );
 
+    // All attendance (any status) that includes at least one of this manager's projects
+    @Query("""
+        SELECT DISTINCT p
+        FROM prezencapuntoreve p
+        JOIN FETCH p.puntori pu
+        JOIN FETCH p.detajet d
+        JOIN FETCH d.projekti
+        WHERE EXISTS (
+              SELECT 1
+              FROM PrezencaPuntoreveDetajet d2, ProjektiPrezencaMenaxheret m
+              WHERE d2.prezenca = p
+                AND m.projekti = d2.projekti
+                AND m.menaxheri.id = :idMenaxherit
+          )
+        ORDER BY p.dita DESC, pu.id
+    """)
+    List<prezencapuntoreve> findAllByMenaxheriId(
+            @Param("idMenaxherit") Long idMenaxherit
+    );
+
+    // One worker's attendance in the given statuses, limited to this manager's projects
+    @Query("""
+        SELECT DISTINCT p
+        FROM prezencapuntoreve p
+        JOIN FETCH p.puntori pu
+        JOIN FETCH p.detajet d
+        JOIN FETCH d.projekti
+        WHERE pu.id = :idPuntorit
+          AND p.statusi IN :statuset
+          AND EXISTS (
+              SELECT 1
+              FROM PrezencaPuntoreveDetajet d2, ProjektiPrezencaMenaxheret m
+              WHERE d2.prezenca = p
+                AND m.projekti = d2.projekti
+                AND m.menaxheri.id = :idMenaxherit
+          )
+        ORDER BY p.dita DESC
+    """)
+    List<prezencapuntoreve> findByPuntoriIdAndMenaxheriIdAndStatusiIn(
+            @Param("idPuntorit") Long idPuntorit,
+            @Param("idMenaxherit") Long idMenaxherit,
+            @Param("statuset") List<String> statuset
+    );
+
     // Of the given ids, the attendance that includes at least one of this manager's projects
     @Query("""
         SELECT p

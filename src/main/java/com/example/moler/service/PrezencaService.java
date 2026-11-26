@@ -4,6 +4,7 @@ import com.example.moler.dto.Prezenca.AplikoPrezenceRequest;
 import com.example.moler.dto.Prezenca.PerditesoPrezenceRequest;
 import com.example.moler.dto.Prezenca.PrezencaFormDataResponse;
 import com.example.moler.dto.Prezenca.PrezencaPaVerifikuarResponse;
+import com.example.moler.dto.Prezenca.PrezencaResponse;
 import com.example.moler.exception.ResourceNotFoundException;
 import com.example.moler.model.ProjektiPrezencaPuntoret;
 import com.example.moler.model.prezencapuntoreve;
@@ -374,6 +375,69 @@ public class PrezencaService {
                     );
                 })
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<PrezencaResponse> getTeGjithaPrezencat(Long idMenaxherit) {
+
+        if (idMenaxherit == null) {
+            throw new IllegalArgumentException("Menaxheri eshte i detyrueshem");
+        }
+
+        return prezencaRepository.findAllByMenaxheriId(idMenaxherit)
+                .stream()
+                .map(this::toPrezencaResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<PrezencaResponse> getPrezencatEPuntorit(Long idPuntorit, Long idMenaxherit) {
+
+        if (idMenaxherit == null) {
+            throw new IllegalArgumentException("Menaxheri eshte i detyrueshem");
+        }
+
+        if (!puntoriRepository.existsById(idPuntorit)) {
+            throw new ResourceNotFoundException("Puntori nuk ekziston: " + idPuntorit);
+        }
+
+        // Verified and unverified only; canceled attendance is excluded
+        return prezencaRepository
+                .findByPuntoriIdAndMenaxheriIdAndStatusiIn(
+                        idPuntorit, idMenaxherit, List.of("nv", "v"))
+                .stream()
+                .map(this::toPrezencaResponse)
+                .toList();
+    }
+
+    private PrezencaResponse toPrezencaResponse(prezencapuntoreve p) {
+        puntori pu = p.getPuntori();
+
+        List<PrezencaResponse.ProjektiData> projektet =
+                p.getDetajet().stream()
+                        .map(d -> d.getProjekti())
+                        .map(pr -> new PrezencaResponse.ProjektiData(
+                                pr.getId(),
+                                pr.getEmri(),
+                                pr.getKerkesa(),
+                                pr.getAmbienti()
+                        ))
+                        .toList();
+
+        return new PrezencaResponse(
+                p.getId(),
+                pu.getId(),
+                pu.getEmri(),
+                pu.getMbiemri(),
+                pu.getPozita(),
+                p.getDita(),
+                p.getLlojiOrarit(),
+                p.getStatusi(),
+                p.getArsyejaAnulimit(),
+                p.getDataAnulimit(),
+                p.getDataKrijimit(),
+                projektet
+        );
     }
 
     @Transactional(readOnly = true)

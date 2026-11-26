@@ -70,6 +70,57 @@ public ResponseEntity<?> getFormData(
     );
 }
 
+@GetMapping
+public ResponseEntity<?> getTeGjithaPrezencat(
+        @RequestHeader("Authorization") String authorization) {
+
+    if (authorization == null || !authorization.startsWith("Bearer ")) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(Map.of("message", "Access token is missing"));
+    }
+
+    String token = authorization.substring(7);
+
+    // Only managers can see all attendance
+    if (!"ROLE_MENAXHER".equals(jwtUtil.extractRole(token))) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("message", "Nevoitet qasja e menaxherit"));
+    }
+
+    // Extract manager ID from JWT
+    Long menaxheriId = jwtUtil.extractId(token);
+
+    return ResponseEntity.ok(
+            prezencaService.getTeGjithaPrezencat(menaxheriId)
+    );
+}
+
+@GetMapping("/puntori/{idPuntorit}")
+public ResponseEntity<?> getPrezencatEPuntorit(
+        @RequestHeader("Authorization") String authorization,
+        @PathVariable Long idPuntorit) {
+
+    if (authorization == null || !authorization.startsWith("Bearer ")) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(Map.of("message", "Access token is missing"));
+    }
+
+    String token = authorization.substring(7);
+
+    // Only managers can see a worker's attendance
+    if (!"ROLE_MENAXHER".equals(jwtUtil.extractRole(token))) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("message", "Nevoitet qasja e menaxherit"));
+    }
+
+    // Extract manager ID from JWT
+    Long menaxheriId = jwtUtil.extractId(token);
+
+    return ResponseEntity.ok(
+            prezencaService.getPrezencatEPuntorit(idPuntorit, menaxheriId)
+    );
+}
+
 @GetMapping("/nv")
 public ResponseEntity<?> getPrezencatPaVerifikuara(
         @RequestHeader("Authorization") String authorization) {
