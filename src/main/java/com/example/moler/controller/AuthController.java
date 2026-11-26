@@ -26,6 +26,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.SecureRandom;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -362,7 +363,8 @@ public ResponseEntity<?> verifyEnrollmentCode(
                 c.CompanyAuthId,
                 c.CodeHash,
                 a.Username,
-                a.TenantId
+                a.TenantId,
+                a.CompanyName
             FROM dbo.companyauth_codes c
             INNER JOIN dbo.companyauth a
                 ON a.Id = c.CompanyAuthId
@@ -434,9 +436,12 @@ public ResponseEntity<?> verifyEnrollmentCode(
                 .body(Map.of("message", "Tenant is inactive or does not exist"));
     }
 
-    return ResponseEntity.ok(
-            Map.of("tenantKey", tenantKey)
-    );
+    // HashMap allows a null CompanyName for accounts created before the column existed.
+    Map<String, Object> response = new HashMap<>();
+    response.put("tenantKey", tenantKey);
+    response.put("companyName", matchedCode.get("CompanyName"));
+
+    return ResponseEntity.ok(response);
 }
     // --------------------------------------------------
     // TOKEN HELPER
@@ -463,6 +468,7 @@ public ResponseEntity<?> registerCompany(
 ) {
 
     if (dto.tenantKey() == null || dto.tenantKey().isBlank()
+            || dto.company_name() == null || dto.company_name().isBlank()
             || dto.username() == null || dto.username().isBlank()
             || dto.password() == null || dto.password().isBlank()) {
 
@@ -537,12 +543,14 @@ public ResponseEntity<?> registerCompany(
             """
             INSERT INTO dbo.companyauth (
                 TenantId,
+                CompanyName,
                 Username,
                 Password
             )
-            VALUES (?, ?, ?)
+            VALUES (?, ?, ?, ?)
             """,
             tenantId,
+            dto.company_name().trim(),
             dto.username().trim(),
             hashedPassword
     );
@@ -550,6 +558,7 @@ public ResponseEntity<?> registerCompany(
     return ResponseEntity.status(HttpStatus.CREATED)
             .body(Map.of(
                     "message", "Company registered successfully",
+                    "companyName", dto.company_name().trim(),
                     "username", dto.username().trim(),
                     "tenantKey", dto.tenantKey().trim()
             ));
