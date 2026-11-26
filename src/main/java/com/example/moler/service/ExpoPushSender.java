@@ -64,21 +64,25 @@ public class ExpoPushSender {
         }
     }
 
-    @Async
-    public void dergo(
-            List<String> tokenat,
+    /** One push to one device. */
+    public record Mesazh(
+            String token,
             String titulli,
             String mesazhi,
-            Map<String, Object> data,
-            Tenant tenant
-    ) {
+            Map<String, Object> data
+    ) {}
+
+    @Async
+    public void dergo(List<Mesazh> teGjitha, Tenant tenant) {
         List<String> teVdekur = new ArrayList<>();
 
-        for (int i = 0; i < tokenat.size(); i += MADHESIA_E_GRUPIT) {
-            List<String> grupi = tokenat.subList(i, Math.min(i + MADHESIA_E_GRUPIT, tokenat.size()));
+        for (int i = 0; i < teGjitha.size(); i += MADHESIA_E_GRUPIT) {
+            List<Mesazh> grupiM = teGjitha.subList(i, Math.min(i + MADHESIA_E_GRUPIT, teGjitha.size()));
+            List<String> grupi = grupiM.stream().map(Mesazh::token).toList();
 
-            List<ExpoMessage> mesazhet = grupi.stream()
-                    .map(t -> new ExpoMessage(t, titulli, mesazhi, data, "default", "high", "default"))
+            List<ExpoMessage> mesazhet = grupiM.stream()
+                    .map(m -> new ExpoMessage(
+                            m.token(), m.titulli(), m.mesazhi(), m.data(), "default", "high", "default"))
                     .toList();
 
             try {
