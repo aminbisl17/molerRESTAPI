@@ -6,6 +6,7 @@ import com.example.moler.exception.ResourceNotFoundException;
 import com.example.moler.model.prezencapuntoreve;
 import com.example.moler.model.puntori;
 import com.example.moler.repository.PrezencaPuntoreveRepository;
+import com.example.moler.repository.ProjektiDetajetRepository;
 import com.example.moler.repository.ProjektiRepository;
 import com.example.moler.repository.PuntoriRepository;
 
@@ -25,15 +26,18 @@ public class DashboardService {
     private final PuntoriRepository puntoriRepository;
     private final ProjektiRepository projektiRepository;
     private final PrezencaPuntoreveRepository prezencaRepository;
+    private final ProjektiDetajetRepository projektiDetajetRepository;
 
     public DashboardService(
             PuntoriRepository puntoriRepository,
             ProjektiRepository projektiRepository,
-            PrezencaPuntoreveRepository prezencaRepository
+            PrezencaPuntoreveRepository prezencaRepository,
+            ProjektiDetajetRepository projektiDetajetRepository
     ) {
         this.puntoriRepository = puntoriRepository;
         this.projektiRepository = projektiRepository;
         this.prezencaRepository = prezencaRepository;
+        this.projektiDetajetRepository = projektiDetajetRepository;
     }
 
     @Transactional(readOnly = true)
@@ -50,7 +54,12 @@ public class DashboardService {
         // "e" + "w" together, e.g. 2 + 3 = 5
         long projektetAktive = projektiRepository.countByStatusiIn(List.of("e", "w"));
 
-        return new MenaxheriDashboardResponse(puntoretAktiv, paVerifikuara, projektetAktive);
+        // Total pagesa of completed ("cm") projects
+        BigDecimal pasqyra = projektiDetajetRepository
+                .sumPagesaByProjektiStatusi("cm")
+                .setScale(2, RoundingMode.HALF_UP);
+
+        return new MenaxheriDashboardResponse(puntoretAktiv, paVerifikuara, projektetAktive, pasqyra);
     }
 
     @Transactional(readOnly = true)
