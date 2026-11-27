@@ -8,8 +8,10 @@ import com.example.moler.repository.MenaxheriRepository;
 import com.example.moler.repository.PuntoriRepository;
 import com.example.moler.repository.PushTokenRepository;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -20,26 +22,45 @@ public class PushTokenService {
     private final PushTokenRepository pushTokenRepository;
     private final PuntoriRepository puntoriRepository;
     private final MenaxheriRepository menaxheriRepository;
+    private final TransactionTemplate transactionTemplate;
 
     public PushTokenService(
             PushTokenRepository pushTokenRepository,
             PuntoriRepository puntoriRepository,
-            MenaxheriRepository menaxheriRepository
+            MenaxheriRepository menaxheriRepository,
+            TransactionTemplate transactionTemplate
     ) {
         this.pushTokenRepository = pushTokenRepository;
         this.puntoriRepository = puntoriRepository;
         this.menaxheriRepository = menaxheriRepository;
+        this.transactionTemplate = transactionTemplate;
     }
 
     /**
      * Saves the device token for the logged-in user. If the token already exists
      * (same phone, other user logged in before) it is moved to this user.
+     *
+     * Two requests with the same new token can arrive at once: both find no row and
+     * both insert, and the second hits the UNIQUE constraint on expo_token. That
+     * transaction is rolled back, so it is retried once in a new one, which now finds
+     * the row committed by the other request and updates it.
+     * Not @Transactional on purpose: each attempt needs its own transaction.
      */
-    @Transactional
     public void regjistroToken(String expoToken, String platform, Long idPerdoruesit, boolean eshteMenaxher) {
 
         String token = validoToken(expoToken);
         String platformaENormalizuar = normalizoPlatformen(platform);
+
+        try {
+            transactionTemplate.executeWithoutResult(s ->
+                    ruajToken(token, platformaENormalizuar, idPerdoruesit, eshteMenaxher));
+        } catch (DataIntegrityViolationException e) {
+            transactionTemplate.executeWithoutResult(s ->
+                    ruajToken(token, platformaENormalizuar, idPerdoruesit, eshteMenaxher));
+        }
+    }
+
+    private void ruajToken(String token, String platformaENormalizuar, Long idPerdoruesit, boolean eshteMenaxher) {
 
         PushToken pushToken = pushTokenRepository.findByExpoToken(token)
                 .orElseGet(() -> {
