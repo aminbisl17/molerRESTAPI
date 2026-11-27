@@ -88,6 +88,11 @@ public class DashboardService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add)
                 .setScale(2, RoundingMode.HALF_UP);
 
-        return new PuntoriDashboardResponse(teVerifikuara.size(), rroga);
+        // Days worked: full day 1, half day 0.5 (1 full + 1 half = 1.5)
+        double ditet = teVerifikuara.stream()
+                .mapToDouble(p -> "h".equals(p.getLlojiOrarit()) ? 0.5 : 1.0)
+                .sum();
+
+        return new PuntoriDashboardResponse(ditet, rroga);
     }
 }
