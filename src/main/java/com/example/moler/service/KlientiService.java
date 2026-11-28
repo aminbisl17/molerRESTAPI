@@ -31,14 +31,25 @@ public class KlientiService {
     @Transactional
     public KlientiResponse createKlienti(CreateKlientiRequest request) {
 
+        String emri = required(request.emri(), "Emri i klientit", 100);
+        String mbiemri = required(request.mbiemri(), "Mbiemri i klientit", 100);
+        String lokacioni = required(request.lokacioni(), "Lokacioni i klientit", 255);
+        String numriITelefonit =
+                optional(request.numriITelefonit(), "Numri i telefonit", 20);
+
+        // Duplicate checks (null id = new client)
+        checkDuplicates(emri, mbiemri, lokacioni, numriITelefonit, null);
+
         klienti k = new klienti();
 
-        k.setEmri(required(request.emri(), "Emri i klientit", 100));
-        k.setMbiemri(required(request.mbiemri(), "Mbiemri i klientit", 100));
-        k.setLokacioni(required(request.lokacioni(), "Lokacioni i klientit", 255));
-        k.setNumriITelefonit(optional(request.numriITelefonit(), "Numri i telefonit", 20));
+        k.setEmri(emri);
+        k.setMbiemri(mbiemri);
+        k.setLokacioni(lokacioni);
+        k.setNumriITelefonit(numriITelefonit);
 
-        return KlientiResponse.from(klientiRepository.save(k));
+        // Flush here so a constraint violation (e.g. concurrent insert)
+        // is raised inside this call and handled by GlobalExceptionHandler
+        return KlientiResponse.from(klientiRepository.saveAndFlush(k));
     }
 
     @Transactional(readOnly = true)
@@ -71,23 +82,79 @@ public class KlientiService {
 
         klienti k = findKlienti(id);
 
-        if (request.emri() != null) {
-            k.setEmri(required(request.emri(), "Emri i klientit", 100));
+        // Resolve the final values first; fields left null keep their current value
+        String emri = request.emri() != null
+                ? required(request.emri(), "Emri i klientit", 100)
+                : k.getEmri();
+
+        String mbiemri = request.mbiemri() != null
+                ? required(request.mbiemri(), "Mbiemri i klientit", 100)
+                : k.getMbiemri();
+
+        String lokacioni = request.lokacioni() != null
+                ? required(request.lokacioni(), "Lokacioni i klientit", 255)
+                : k.getLokacioni();
+
+        String numriITelefonit = request.numriITelefonit() != null
+                ? optional(request.numriITelefonit(), "Numri i telefonit", 20)
+                : k.getNumriITelefonit();
+
+        // Check before modifying the managed entity, otherwise Hibernate's
+        // auto-flush before the check query would hit the DB constraint first.
+        // The current client is excluded so it can keep its own phone number.
+        checkDuplicates(emri, mbiemri, lokacioni, numriITelefonit, id);
+
+        k.setEmri(emri);
+        k.setMbiemri(mbiemri);
+        k.setLokacioni(lokacioni);
+        k.setNumriITelefonit(numriITelefonit);
+
+        return KlientiResponse.from(klientiRepository.saveAndFlush(k));
+    }
+
+    // excludeId = null when creating, the client's own ID when updating
+    private void checkDuplicates(
+            String emri,
+            String mbiemri,
+            String lokacioni,
+            String numriITelefonit,
+            Long excludeId
+    ) {
+
+        if (numriITelefonit != null) {
+
+            boolean phoneExists = excludeId == null
+                    ? klientiRepository.existsByNumriITelefonit(numriITelefonit)
+                    : klientiRepository.existsByNumriITelefonitAndIdNot(
+                            numriITelefonit, excludeId
+                    );
+
+            if (phoneExists) {
+                throw new IllegalArgumentException(
+                        "Ky numër telefoni ekziston tashmë."
+                );
+            }
+
+            // A unique phone number also makes the full detail set unique
+            return;
         }
 
-        if (request.mbiemri() != null) {
-            k.setMbiemri(required(request.mbiemri(), "Mbiemri i klientit", 100));
-        }
+        // No phone number: UQ_klienti_unique_details still applies
+        boolean detailsExist = excludeId == null
+                ? klientiRepository
+                        .existsByEmriAndMbiemriAndLokacioniAndNumriITelefonitIsNull(
+                                emri, mbiemri, lokacioni
+                        )
+                : klientiRepository
+                        .existsByEmriAndMbiemriAndLokacioniAndNumriITelefonitIsNullAndIdNot(
+                                emri, mbiemri, lokacioni, excludeId
+                        );
 
-        if (request.lokacioni() != null) {
-            k.setLokacioni(required(request.lokacioni(), "Lokacioni i klientit", 255));
+        if (detailsExist) {
+            throw new IllegalArgumentException(
+                    "Ky klient me keto te dhena ekziston tashmë."
+            );
         }
-
-        if (request.numriITelefonit() != null) {
-            k.setNumriITelefonit(optional(request.numriITelefonit(), "Numri i telefonit", 20));
-        }
-
-        return KlientiResponse.from(klientiRepository.save(k));
     }
 
     @Transactional
@@ -103,6 +170,9 @@ public class KlientiService {
         }
 
         klientiRepository.delete(k);
+
+        // Flush so a FK violation is raised here and handled by GlobalExceptionHandler
+        klientiRepository.flush();
     }
 
     // Used by ProjektiService when assigning a client to a project
