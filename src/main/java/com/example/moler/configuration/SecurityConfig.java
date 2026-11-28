@@ -171,6 +171,9 @@ public class SecurityConfig {
                 .requestMatchers("/push-token").hasAnyRole("PUNTOR", "MENAXHER")
 
                 .requestMatchers("/njoftimet", "/njoftimet/**").hasAnyRole("PUNTOR", "MENAXHER")
+
+                // Requests: both roles; approve / decline is checked as manager-only in KerkesaController
+                .requestMatchers("/kerkesat", "/kerkesat/**").hasAnyRole("PUNTOR", "MENAXHER")
                 // EVERYTHING ELSE
                 .anyRequest().authenticated()
             )

@@ -2,6 +2,7 @@ package com.example.moler.exception;
 
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -33,6 +34,17 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(Map.of(
                         "status", 400,
+                        "message", ex.getMessage()
+                ));
+    }
+
+    // Ownership / permission checks inside services
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<?> handleForbidden(AccessDeniedException ex) {
+
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of(
+                        "status", 403,
                         "message", ex.getMessage()
                 ));
     }

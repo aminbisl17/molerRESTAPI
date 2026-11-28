@@ -58,9 +58,16 @@ public class DashboardService {
         // "e" + "w" together, e.g. 2 + 3 = 5
         long projektetAktive = projektiRepository.countByStatusiIn(List.of("e", "w"));
 
-        // Total pagesa of completed ("cm") projects
+        // Total pagesa of projects completed ("cm") in the current month,
+        // based on dita_perfundimit (set when the status changes to "cm")
+        YearMonth muajiAktual = YearMonth.now(ZoneId.of("Europe/Skopje"));
+
         BigDecimal pasqyra = projektiDetajetRepository
-                .sumPagesaByProjektiStatusi("cm")
+                .sumPagesaByProjektiStatusiAndPeriudha(
+                        "cm",
+                        muajiAktual.atDay(1).atStartOfDay(),
+                        muajiAktual.plusMonths(1).atDay(1).atStartOfDay()
+                )
                 .setScale(2, RoundingMode.HALF_UP);
 
         // Total number of clients (tenant schema)
