@@ -5,6 +5,7 @@ import com.example.moler.dto.Dashboard.PuntoriDashboardResponse;
 import com.example.moler.exception.ResourceNotFoundException;
 import com.example.moler.model.prezencapuntoreve;
 import com.example.moler.model.puntori;
+import com.example.moler.repository.KlientiRepository;
 import com.example.moler.repository.PrezencaPuntoreveRepository;
 import com.example.moler.repository.ProjektiDetajetRepository;
 import com.example.moler.repository.ProjektiRepository;
@@ -27,17 +28,20 @@ public class DashboardService {
     private final ProjektiRepository projektiRepository;
     private final PrezencaPuntoreveRepository prezencaRepository;
     private final ProjektiDetajetRepository projektiDetajetRepository;
+    private final KlientiRepository klientiRepository;
 
     public DashboardService(
             PuntoriRepository puntoriRepository,
             ProjektiRepository projektiRepository,
             PrezencaPuntoreveRepository prezencaRepository,
-            ProjektiDetajetRepository projektiDetajetRepository
+            ProjektiDetajetRepository projektiDetajetRepository,
+            KlientiRepository klientiRepository
     ) {
         this.puntoriRepository = puntoriRepository;
         this.projektiRepository = projektiRepository;
         this.prezencaRepository = prezencaRepository;
         this.projektiDetajetRepository = projektiDetajetRepository;
+        this.klientiRepository = klientiRepository;
     }
 
     @Transactional(readOnly = true)
@@ -59,7 +63,12 @@ public class DashboardService {
                 .sumPagesaByProjektiStatusi("cm")
                 .setScale(2, RoundingMode.HALF_UP);
 
-        return new MenaxheriDashboardResponse(puntoretAktiv, paVerifikuara, projektetAktive, pasqyra);
+        // Total number of clients (tenant schema)
+        long nrKlienteve = klientiRepository.count();
+
+        return new MenaxheriDashboardResponse(
+                puntoretAktiv, paVerifikuara, projektetAktive, pasqyra, nrKlienteve
+        );
     }
 
     @Transactional(readOnly = true)
