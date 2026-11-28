@@ -1,5 +1,7 @@
 package com.example.moler.dto.Projekti;
 
+import com.example.moler.dto.Klienti.KlientiResponse;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -12,7 +14,10 @@ public record ProjektiDetailsResponse(
 
         List<MaterialResponse> materialet,
 
-        DetajetResponse detajet
+        DetajetResponse detajet,
+
+        // null when no client is assigned
+        KlientiResponse klienti
 
 ) {
 

@@ -1,6 +1,7 @@
 
 package com.example.moler.service;
 
+import com.example.moler.dto.Klienti.KlientiResponse;
 import com.example.moler.dto.Projekti.CreateProjektiRequest;
 import com.example.moler.dto.Projekti.ProjektiDetailsResponse;
 import com.example.moler.dto.Projekti.ProjektiFormDataResponse;
@@ -9,6 +10,7 @@ import com.example.moler.dto.Projekti.UpdateProjektiRequest;
 import com.example.moler.exception.ResourceNotFoundException;
 
 import com.example.moler.model.projekti;
+import com.example.moler.model.klienti;
 import com.example.moler.model.menaxheri;
 import com.example.moler.model.puntori;
 import com.example.moler.model.materiali;
@@ -53,6 +55,7 @@ public class ProjektiService {
     private final ProjektiPrezencaMenaxheretRepository prezencaMenaxheretRepository;
     private final ProjektiPrezencaPuntoretRepository prezencaPuntoretRepository;
     private final ProjektiDetajetRepository projektidetajetRepository;
+    private final KlientiService klientiService;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -65,7 +68,8 @@ public class ProjektiService {
             ProjektiMaterialiRepository projektiMaterialiRepository,
             ProjektiPrezencaMenaxheretRepository prezencaMenaxheretRepository,
             ProjektiPrezencaPuntoretRepository prezencaPuntoretRepository,
-            ProjektiDetajetRepository projektidetajetRepository
+            ProjektiDetajetRepository projektidetajetRepository,
+            KlientiService klientiService
     ) {
         this.projektiRepository = projektiRepository;
         this.menaxheriRepository = menaxheriRepository;
@@ -75,6 +79,7 @@ public class ProjektiService {
         this.prezencaMenaxheretRepository = prezencaMenaxheretRepository;
         this.prezencaPuntoretRepository = prezencaPuntoretRepository;
         this.projektidetajetRepository = projektidetajetRepository;
+        this.klientiService = klientiService;
     }
 
     @Transactional
@@ -122,8 +127,19 @@ public class ProjektiService {
             );
         }
 
-        // 3. Create project
+        // 3. Validate client (required on creation)
+        if (request.idKlientit() == null) {
+            throw new IllegalArgumentException(
+                    "Klienti eshte i detyrueshem per krijimin e projektit."
+            );
+        }
+
+        klienti klienti = klientiService.findKlienti(request.idKlientit());
+
+        // 4. Create project
         projekti projekti = new projekti();
+
+        projekti.setKlienti(klienti);
 
         projekti.setEmri(request.emri());
         projekti.setLokacioni(request.lokacioni());
@@ -303,23 +319,29 @@ public class ProjektiService {
         }
 
         // 9. Return created project
+        return toProjektiResponse(projekti);
+    }
+
+    // Shared mapping for every endpoint that returns ProjektiResponse
+    public static ProjektiResponse toProjektiResponse(projekti p) {
         return new ProjektiResponse(
-                projekti.getId(),
-                projekti.getEmri(),
-                projekti.getLokacioni(),
-                projekti.getKerkesa(),
-                projekti.getStatusi(),
-                projekti.getPrioriteti(),
-                projekti.getAmbienti(),
-                projekti.getDataFillimitTePlanifikuar(),
-                projekti.getDataPerfundimitTePlanifikuar(),
-                projekti.getDataKrijimit()
+                p.getId(),
+                p.getEmri(),
+                p.getLokacioni(),
+                p.getKerkesa(),
+                p.getStatusi(),
+                p.getPrioriteti(),
+                p.getAmbienti(),
+                p.getDataFillimitTePlanifikuar(),
+                p.getDataPerfundimitTePlanifikuar(),
+                p.getDataKrijimit(),
+                KlientiResponse.from(p.getKlienti())
         );
     }
 @Transactional(readOnly = true)
 public ProjektiDetailsResponse getProjektiById(Long id) {
 
-    projektiRepository.findById(id)
+    projekti projekti = projektiRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException(
                     "Projekti me ID " + id + " nuk ekziston."
             ));
@@ -382,7 +404,8 @@ public ProjektiDetailsResponse getProjektiById(Long id) {
             menaxheret,
             puntoret,
             materialet,
-            detajet
+            detajet,
+            KlientiResponse.from(projekti.getKlienti())
     );
 }
 
@@ -391,18 +414,7 @@ public List<ProjektiResponse> getAllProjektet() {
 
     return projektiRepository.findAll()
             .stream()
-            .map(p -> new ProjektiResponse(
-                    p.getId(),
-                    p.getEmri(),
-                    p.getLokacioni(),
-                    p.getKerkesa(),
-                    p.getStatusi(),
-                    p.getPrioriteti(),
-                    p.getAmbienti(),
-                    p.getDataFillimitTePlanifikuar(),
-                    p.getDataPerfundimitTePlanifikuar(),
-                    p.getDataKrijimit()
-            ))
+            .map(ProjektiService::toProjektiResponse)
             .toList();
 }
 
@@ -445,10 +457,15 @@ public ProjektiFormDataResponse getProjektiFormData() {
                     ))
                     .toList();
 
+    // All clients, so one can be picked when creating a project
+    List<KlientiResponse> klientet =
+            klientiService.getAllKlientet();
+
     return new ProjektiFormDataResponse(
             menaxheret,
             puntoret,
-            materialet
+            materialet,
+            klientet
     );
 }
 
@@ -486,6 +503,18 @@ public ProjektiResponse updateProjekti(Long id, UpdateProjektiRequest request) {
         throw new IllegalArgumentException(
                 "Data e perfundimit nuk mund te jete para dates se fillimit."
         );
+    }
+
+    // Client: assign / change with idKlientit, remove with hiqKlientin = true
+    if (Boolean.TRUE.equals(request.hiqKlientin())) {
+        if (request.idKlientit() != null) {
+            throw new IllegalArgumentException(
+                    "Nuk mund te caktohet dhe te hiqet klienti njekohesisht."
+            );
+        }
+        p.setKlienti(null);
+    } else if (request.idKlientit() != null) {
+        p.setKlienti(klientiService.findKlienti(request.idKlientit()));
     }
 
     // 2. Status + automatic dates
@@ -655,18 +684,7 @@ public ProjektiResponse updateProjekti(Long id, UpdateProjektiRequest request) {
     }
 
     // 7. Return updated project
-    return new ProjektiResponse(
-            p.getId(),
-            p.getEmri(),
-            p.getLokacioni(),
-            p.getKerkesa(),
-            p.getStatusi(),
-            p.getPrioriteti(),
-            p.getAmbienti(),
-            p.getDataFillimitTePlanifikuar(),
-            p.getDataPerfundimitTePlanifikuar(),
-            p.getDataKrijimit()
-    );
+    return toProjektiResponse(p);
 }
 
 /**

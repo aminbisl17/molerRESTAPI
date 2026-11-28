@@ -12,6 +12,8 @@ public record CreateProjektiRequest(
         String ambienti,
         LocalDate dataFillimitTePlanifikuar,
         LocalDate dataPerfundimitTePlanifikuar,
+        // Required: a project cannot be created without a client
+        Long idKlientit,
         List<Long> menaxheret,
         List<Long> puntoret,
         List<MaterialRequest> materialet,

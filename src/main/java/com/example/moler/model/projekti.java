@@ -43,6 +43,11 @@ public class projekti {
     @Column(name = "data_krijimit", insertable = false, updatable = false)
     private LocalDateTime dataKrijimit;
 
+    // One client can have many projects; a project has at most one client
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_klientit")
+    private klienti klienti;
+
     public projekti() {}
 
     public Long getId() {
@@ -131,5 +136,13 @@ public class projekti {
 
     public void setDataKrijimit(LocalDateTime dataKrijimit) {
         this.dataKrijimit = dataKrijimit;
+    }
+
+    public klienti getKlienti() {
+        return klienti;
+    }
+
+    public void setKlienti(klienti klienti) {
+        this.klienti = klienti;
     }
 }

@@ -2,6 +2,7 @@
 package com.example.moler.repository;
 
 import com.example.moler.model.projekti;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -26,6 +27,16 @@ public interface ProjektiRepository extends JpaRepository<projekti, Long> {
     );
 
     List<projekti> findByEmriContainingIgnoreCase(String emri);
+
+    // Load the client together with the projects (avoids one query per project)
+    @Override
+    @EntityGraph(attributePaths = "klienti")
+    List<projekti> findAll();
+
+    @EntityGraph(attributePaths = "klienti")
+    List<projekti> findByKlienti_Id(Long idKlientit);
+
+    boolean existsByKlienti_Id(Long idKlientit);
 
     @Query(value = """
     SELECT

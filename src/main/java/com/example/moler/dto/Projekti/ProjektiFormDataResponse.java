@@ -1,5 +1,7 @@
 package com.example.moler.dto.Projekti;
 
+import com.example.moler.dto.Klienti.KlientiResponse;
+
 import java.math.BigDecimal;
 import java.util.List;
 
@@ -9,7 +11,9 @@ public record ProjektiFormDataResponse(
 
         List<PuntorResponse> puntoret,
 
-        List<MaterialResponse> materialet
+        List<MaterialResponse> materialet,
+
+        List<KlientiResponse> klientet
 
 ) {
 

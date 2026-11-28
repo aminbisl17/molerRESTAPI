@@ -148,7 +148,8 @@ public class SecurityConfig {
                         "/menaxheri/dashboard",
                         "/notifications/**",
                         "/menaxheri/puntori/**",
-                        "/projekti/**"
+                        "/projekti/**",
+                        "/klienti/**"
                 ).hasRole("MENAXHER")
 
                 // PUNTOR ENDPOINTS
