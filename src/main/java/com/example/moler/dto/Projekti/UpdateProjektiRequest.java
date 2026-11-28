@@ -26,11 +26,9 @@ public record UpdateProjektiRequest(
         // Cancellation description
         String pershkrimiAnulimit,
 
-        // Assigns or changes the client (null = unchanged)
+        // The client cannot be changed after creation.
+        // Accepted only if it matches the current client (e.g. a resent form).
         Long idKlientit,
-
-        // true removes the client from the project
-        Boolean hiqKlientin,
 
         List<Long> menaxheret,
 

@@ -505,16 +505,17 @@ public ProjektiResponse updateProjekti(Long id, UpdateProjektiRequest request) {
         );
     }
 
-    // Client: assign / change with idKlientit, remove with hiqKlientin = true
-    if (Boolean.TRUE.equals(request.hiqKlientin())) {
-        if (request.idKlientit() != null) {
+    // Client is fixed once the project is created
+    if (request.idKlientit() != null) {
+        Long currentKlientId = p.getKlienti() != null
+                ? p.getKlienti().getId()
+                : null;
+
+        if (!request.idKlientit().equals(currentKlientId)) {
             throw new IllegalArgumentException(
-                    "Nuk mund te caktohet dhe te hiqet klienti njekohesisht."
+                    "Klienti i projektit nuk mund te ndryshohet pas krijimit."
             );
         }
-        p.setKlienti(null);
-    } else if (request.idKlientit() != null) {
-        p.setKlienti(klientiService.findKlienti(request.idKlientit()));
     }
 
     // 2. Status + automatic dates
