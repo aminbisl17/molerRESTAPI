@@ -20,6 +20,7 @@ import org.slf4j.LoggerFactory;
 import com.example.moler.repository.ProjektiRepository;
 import com.example.moler.repository.PuntoriRepository;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -118,8 +119,16 @@ public class PrezencaService {
             prezenca.shtoProjekt(projekti);
         }
 
-        // Details are saved together with the attendance (cascade)
-        prezencapuntoreve ruajtur = prezencaRepository.save(prezenca);
+        // Details are saved together with the attendance (cascade).
+        // Flushed here so that a second request for the same day arriving at the
+        // same time (double tap) hits UQ (id_puntorit, dita) inside this call.
+        prezencapuntoreve ruajtur;
+
+        try {
+            ruajtur = prezencaRepository.saveAndFlush(prezenca);
+        } catch (DataIntegrityViolationException e) {
+            throw new IllegalArgumentException("Keni aplikuar tashme per sot");
+        }
 
         njoftoMenaxheret(ruajtur, puntori, idProjektet);
 
@@ -287,9 +296,10 @@ public class PrezencaService {
 
         Set<Long> teRinjte = new LinkedHashSet<>(idProjektet);
 
-        // Remove projects that are no longer selected (orphanRemoval deletes the rows)
+        // Remove projects that are no longer selected, and rows without a project
+        // (orphanRemoval deletes the rows)
         prezenca.getDetajet().removeIf(d ->
-                !teRinjte.contains(d.getProjekti().getId()));
+                d.getProjekti() == null || !teRinjte.contains(d.getProjekti().getId()));
 
         Set<Long> ekzistuese = new HashSet<>();
         prezenca.getDetajet().forEach(d -> ekzistuese.add(d.getProjekti().getId()));
@@ -474,6 +484,7 @@ public class PrezencaService {
                     List<PrezencaPaVerifikuarResponse.ProjektiData> projektet =
                             p.getDetajet().stream()
                                     .map(d -> d.getProjekti())
+                                    .filter(pr -> pr != null) // rows without a project are skipped
                                     .map(pr -> new PrezencaPaVerifikuarResponse.ProjektiData(
                                             pr.getId(),
                                             pr.getEmri(),
@@ -539,6 +550,7 @@ public class PrezencaService {
         List<PrezencaResponse.ProjektiData> projektet =
                 p.getDetajet().stream()
                         .map(d -> d.getProjekti())
+                        .filter(pr -> pr != null) // rows without a project are skipped
                         .map(pr -> new PrezencaResponse.ProjektiData(
                                 pr.getId(),
                                 pr.getEmri(),

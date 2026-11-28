@@ -68,7 +68,7 @@ public interface PrezencaPuntoreveRepository
         FROM prezencapuntoreve p
         JOIN FETCH p.puntori pu
         JOIN FETCH p.detajet d
-        JOIN FETCH d.projekti
+        LEFT JOIN FETCH d.projekti
         WHERE p.statusi = 'nv'
           AND EXISTS (
               SELECT 1
@@ -114,7 +114,7 @@ public interface PrezencaPuntoreveRepository
         FROM prezencapuntoreve p
         JOIN FETCH p.puntori pu
         JOIN FETCH p.detajet d
-        JOIN FETCH d.projekti
+        LEFT JOIN FETCH d.projekti
         WHERE EXISTS (
               SELECT 1
               FROM PrezencaPuntoreveDetajet d2, ProjektiPrezencaMenaxheret m
@@ -134,7 +134,7 @@ public interface PrezencaPuntoreveRepository
         FROM prezencapuntoreve p
         JOIN FETCH p.puntori pu
         JOIN FETCH p.detajet d
-        JOIN FETCH d.projekti
+        LEFT JOIN FETCH d.projekti
         WHERE pu.id = :idPuntorit
           AND p.statusi IN :statuset
           AND EXISTS (
@@ -158,7 +158,7 @@ public interface PrezencaPuntoreveRepository
         FROM prezencapuntoreve p
         JOIN FETCH p.puntori pu
         JOIN FETCH p.detajet d
-        JOIN FETCH d.projekti
+        LEFT JOIN FETCH d.projekti
         WHERE pu.id = :idPuntorit
           AND p.statusi IN :statuset
         ORDER BY p.dita DESC

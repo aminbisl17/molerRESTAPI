@@ -18,7 +18,8 @@ public class PrezencaPuntoreveDetajet {
     private prezencapuntoreve prezenca;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "id_projektit", nullable = false)
+    // Nullable: a detail row may have no project
+    @JoinColumn(name = "id_projektit")
     private projekti projekti;
 
     public PrezencaPuntoreveDetajet() {}
