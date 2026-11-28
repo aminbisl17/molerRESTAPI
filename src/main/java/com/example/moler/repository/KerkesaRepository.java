@@ -13,9 +13,9 @@ import java.util.Optional;
 @Repository
 public interface KerkesaRepository extends JpaRepository<Kerkesa, Long> {
 
-    // Owner (worker / manager) is loaded in the same query for the response
+    // Worker and manager are loaded in the same query for the response
 
-    // ---------- worker: own requests ----------
+    // ---------- worker: requests they created ----------
 
     @EntityGraph(attributePaths = {"puntori", "menaxheri"})
     List<Kerkesa> findByPuntori_Id(Long idPuntorit, Sort sort);
@@ -26,16 +26,17 @@ public interface KerkesaRepository extends JpaRepository<Kerkesa, Long> {
     @EntityGraph(attributePaths = {"puntori", "menaxheri"})
     Optional<Kerkesa> findByIdAndPuntori_Id(Long id, Long idPuntorit);
 
-    // ---------- manager: all requests of the tenant ----------
+    // Worker dashboard: number of own requests with the given status
+    long countByPuntori_IdAndStatusi(Long idPuntorit, String statusi);
 
-    @Override
-    @EntityGraph(attributePaths = {"puntori", "menaxheri"})
-    List<Kerkesa> findAll(Sort sort);
+    // ---------- manager: requests sent to them ----------
 
     @EntityGraph(attributePaths = {"puntori", "menaxheri"})
-    List<Kerkesa> findByStatusi(String statusi, Sort sort);
+    List<Kerkesa> findByMenaxheri_Id(Long idMenaxherit, Sort sort);
 
-    @Override
     @EntityGraph(attributePaths = {"puntori", "menaxheri"})
-    Optional<Kerkesa> findById(Long id);
+    List<Kerkesa> findByMenaxheri_IdAndStatusi(Long idMenaxherit, String statusi, Sort sort);
+
+    @EntityGraph(attributePaths = {"puntori", "menaxheri"})
+    Optional<Kerkesa> findByIdAndMenaxheri_Id(Long id, Long idMenaxherit);
 }

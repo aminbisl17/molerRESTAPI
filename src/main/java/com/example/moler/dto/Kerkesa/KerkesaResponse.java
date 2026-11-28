@@ -12,14 +12,13 @@ public record KerkesaResponse(
         LocalDateTime dataRefuzimit,    // set by the database trigger
         String pershkrimiAprovimit,
         String pershkrimiAnulimit,
-        Krijuesi krijuesi
+        Personi puntori,                // the worker who created the request
+        Personi menaxheri               // the manager the request was sent to
 ) {
 
-    // Who created the request
-    public record Krijuesi(
+    public record Personi(
             Long id,
             String emri,
-            String mbiemri,
-            String roli                 // "PUNTOR" or "MENAXHER"
+            String mbiemri
     ) {}
 }

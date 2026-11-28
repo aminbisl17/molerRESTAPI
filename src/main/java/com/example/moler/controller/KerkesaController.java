@@ -16,9 +16,9 @@ import java.util.Map;
 import java.util.function.Function;
 
 /**
- * Requests for workers and managers. The user always comes from the JWT.
- * - Workers: create, list, view, edit and delete their own requests.
- * - Managers: create their own, see all requests of the tenant, approve / decline.
+ * Requests. The user always comes from the JWT.
+ * - Workers: create (sent to a chosen manager), list, view, edit and delete their own requests.
+ * - Managers: cannot create; list and view requests sent to them, approve / decline.
  */
 @RestController
 @RequestMapping("/kerkesat")
@@ -32,18 +32,27 @@ public class KerkesaController {
         this.jwtUtil = jwtUtil;
     }
 
-    // POST /kerkesat — create a request (worker or manager)
+    // POST /kerkesat — worker only, sent to the chosen manager
     @PostMapping
     public ResponseEntity<?> krijo(
             @RequestHeader("Authorization") String authorization,
             @RequestBody KrijoKerkesenRequest request) {
 
-        return meperdorues(authorization, p ->
+        return puntor(authorization, p ->
                 ResponseEntity.status(HttpStatus.CREATED)
-                        .body(kerkesaService.krijo(p, request)));
+                        .body(kerkesaService.krijo(p.id(), request)));
     }
 
-    // GET /kerkesat?statusi=w — worker: own requests, manager: all requests
+    // GET /kerkesat/menaxheret — worker only, managers to choose from when creating
+    @GetMapping("/menaxheret")
+    public ResponseEntity<?> menaxheret(
+            @RequestHeader("Authorization") String authorization) {
+
+        return puntor(authorization, p ->
+                ResponseEntity.ok(kerkesaService.menaxheretPerZgjedhje()));
+    }
+
+    // GET /kerkesat?statusi=w — worker: own requests, manager: requests sent to them
     @GetMapping
     public ResponseEntity<?> listo(
             @RequestHeader("Authorization") String authorization,
@@ -63,15 +72,15 @@ public class KerkesaController {
                 ResponseEntity.ok(kerkesaService.merr(p, id)));
     }
 
-    // PUT /kerkesat/{id} — creator edits title / description while waiting
+    // PUT /kerkesat/{id} — worker only, own request while waiting
     @PutMapping("/{id}")
     public ResponseEntity<?> perditeso(
             @RequestHeader("Authorization") String authorization,
             @PathVariable Long id,
             @RequestBody PerditesoKerkesenRequest request) {
 
-        return meperdorues(authorization, p ->
-                ResponseEntity.ok(kerkesaService.perditeso(p, id, request)));
+        return puntor(authorization, p ->
+                ResponseEntity.ok(kerkesaService.perditeso(p.id(), id, request)));
     }
 
     // PATCH /kerkesat/{id}/aprovo — manager only
@@ -82,7 +91,7 @@ public class KerkesaController {
             @RequestBody(required = false) AprovoKerkesenRequest request) {
 
         return menaxher(authorization, p ->
-                ResponseEntity.ok(kerkesaService.aprovo(p, id, request)));
+                ResponseEntity.ok(kerkesaService.aprovo(p.id(), id, request)));
     }
 
     // PATCH /kerkesat/{id}/refuzo — manager only
@@ -93,17 +102,17 @@ public class KerkesaController {
             @RequestBody(required = false) RefuzoKerkesenRequest request) {
 
         return menaxher(authorization, p ->
-                ResponseEntity.ok(kerkesaService.refuzo(p, id, request)));
+                ResponseEntity.ok(kerkesaService.refuzo(p.id(), id, request)));
     }
 
-    // DELETE /kerkesat/{id}
+    // DELETE /kerkesat/{id} — worker only, own request while waiting
     @DeleteMapping("/{id}")
     public ResponseEntity<?> fshi(
             @RequestHeader("Authorization") String authorization,
             @PathVariable Long id) {
 
-        return meperdorues(authorization, p -> {
-            kerkesaService.fshi(p, id);
+        return puntor(authorization, p -> {
+            kerkesaService.fshi(p.id(), id);
             return ResponseEntity.noContent().build();
         });
     }
@@ -140,6 +149,20 @@ public class KerkesaController {
             if (!p.eshteMenaxher()) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN)
                         .body(Map.of("message", "Nevoitet qasja e menaxherit"));
+            }
+            return veprim.apply(p);
+        });
+    }
+
+    /** Same as meperdorues, but only workers are allowed. */
+    private ResponseEntity<?> puntor(
+            String authorization,
+            Function<Perdoruesi, ResponseEntity<?>> veprim) {
+
+        return meperdorues(authorization, p -> {
+            if (p.eshteMenaxher()) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("message", "Vetem puntoret mund ta bejne kete veprim"));
             }
             return veprim.apply(p);
         });

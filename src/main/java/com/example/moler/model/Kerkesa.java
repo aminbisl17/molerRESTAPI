@@ -4,8 +4,8 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 /**
- * A request created by a worker or a manager.
- * Exactly one of puntori / menaxheri is the owner (the creator).
+ * A request created by a worker (puntori) and sent to one manager (menaxheri),
+ * who approves or declines it. The worker cannot be changed after creation.
  * data_krijimit, data_aprovimit and data_refuzimit are managed by SQL Server
  * (default value + trigger), so they are never written from Java.
  */
@@ -22,13 +22,14 @@ public class Kerkesa {
     private puntori puntori;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "id_menaxheri", updatable = false)
+    @JoinColumn(name = "id_menaxheri")
     private menaxheri menaxheri;
 
     @Column(name = "titulli", nullable = false, length = 255)
     private String titulli;
 
-    @Column(name = "pershkrimi", nullable = false)
+    // Optional
+    @Column(name = "pershkrimi")
     private String pershkrimi;
 
     // w = waiting, a = accepted, d = declined

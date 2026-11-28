@@ -5,6 +5,7 @@ import com.example.moler.dto.Dashboard.PuntoriDashboardResponse;
 import com.example.moler.exception.ResourceNotFoundException;
 import com.example.moler.model.prezencapuntoreve;
 import com.example.moler.model.puntori;
+import com.example.moler.repository.KerkesaRepository;
 import com.example.moler.repository.KlientiRepository;
 import com.example.moler.repository.PrezencaPuntoreveRepository;
 import com.example.moler.repository.ProjektiDetajetRepository;
@@ -29,14 +30,17 @@ public class DashboardService {
     private final PrezencaPuntoreveRepository prezencaRepository;
     private final ProjektiDetajetRepository projektiDetajetRepository;
     private final KlientiRepository klientiRepository;
+    private final KerkesaRepository kerkesaRepository;
 
     public DashboardService(
             PuntoriRepository puntoriRepository,
             ProjektiRepository projektiRepository,
             PrezencaPuntoreveRepository prezencaRepository,
             ProjektiDetajetRepository projektiDetajetRepository,
-            KlientiRepository klientiRepository
+            KlientiRepository klientiRepository,
+            KerkesaRepository kerkesaRepository
     ) {
+        this.kerkesaRepository = kerkesaRepository;
         this.puntoriRepository = puntoriRepository;
         this.projektiRepository = projektiRepository;
         this.prezencaRepository = prezencaRepository;
@@ -109,6 +113,9 @@ public class DashboardService {
                 .mapToDouble(p -> "h".equals(p.getLlojiOrarit()) ? 0.5 : 1.0)
                 .sum();
 
-        return new PuntoriDashboardResponse(ditet, rroga);
+        // Own requests waiting for a decision
+        long nrKerkesave = kerkesaRepository.countByPuntori_IdAndStatusi(idPuntorit, "w");
+
+        return new PuntoriDashboardResponse(ditet, rroga, nrKerkesave);
     }
 }

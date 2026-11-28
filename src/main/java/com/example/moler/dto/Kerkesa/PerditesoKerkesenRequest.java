@@ -1,7 +1,9 @@
 package com.example.moler.dto.Kerkesa;
 
-// Fields left null are not changed. Owner and status cannot be changed here.
+// Worker edits a waiting request. Fields left null are not changed.
+// idMenaxherit sends the request to a different manager.
 public record PerditesoKerkesenRequest(
+        Long idMenaxherit,
         String titulli,
         String pershkrimi
 ) {}

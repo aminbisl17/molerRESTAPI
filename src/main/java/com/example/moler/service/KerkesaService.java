@@ -21,7 +21,6 @@ import jakarta.persistence.PersistenceContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Sort;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,9 +29,12 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Requests (kerkesat) of workers and managers.
- * - Workers see and manage only their own requests.
- * - Managers see all requests of their tenant and approve / decline them.
+ * Requests (kerkesat).
+ * - Workers create a request and send it to a manager of their choice; they see,
+ *   edit and delete only their own requests (edit / delete only while waiting).
+ * - Managers cannot create requests; they see only the requests sent to them
+ *   and approve / decline them.
+ * Role checks (who may call which endpoint) are done in KerkesaController.
  * Decision dates are set by the SQL Server trigger, never from Java.
  */
 @Service
@@ -49,6 +51,9 @@ public class KerkesaService {
     // Newest first; id breaks ties for requests created in the same instant
     private static final Sort RENDITJA =
             Sort.by(Sort.Order.desc("dataKrijimit"), Sort.Order.desc("id"));
+
+    // Notification body limit (njoftimet.mesazhi)
+    private static final int MAX_MESAZHI = 500;
 
     private final KerkesaRepository kerkesaRepository;
     private final PuntoriRepository puntoriRepository;
@@ -70,78 +75,48 @@ public class KerkesaService {
         this.notificationService = notificationService;
     }
 
+    // ---------- worker ----------
+
+    /** Worker creates a request and sends it to the chosen manager. */
     @Transactional
-    public KerkesaResponse krijo(Perdoruesi p, KrijoKerkesenRequest request) {
+    public KerkesaResponse krijo(Long idPuntorit, KrijoKerkesenRequest request) {
+
+        String titulli = teksti(request.titulli(), "Titulli", 255);
+        // Optional: missing or blank is stored as null
+        String pershkrimi = opsional(request.pershkrimi());
+
+        if (request.idMenaxherit() == null) {
+            throw new IllegalArgumentException("Menaxheri eshte i detyrueshem.");
+        }
+
+        puntori pu = puntoriRepository.findById(idPuntorit)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Puntori me ID " + idPuntorit + " nuk ekziston."
+                ));
 
         Kerkesa k = new Kerkesa();
 
-        k.setTitulli(teksti(request.titulli(), "Titulli", 255));
-        k.setPershkrimi(teksti(request.pershkrimi(), "Pershkrimi", null));
+        k.setPuntori(pu);
+        k.setMenaxheri(gjejMenaxherin(request.idMenaxherit()));
+        k.setTitulli(titulli);
+        k.setPershkrimi(pershkrimi);
         k.setStatusi(NE_PRITJE);
-
-        // The owner is always the logged-in user
-        if (p.eshteMenaxher()) {
-            menaxheri m = menaxheriRepository.findById(p.id())
-                    .orElseThrow(() -> new ResourceNotFoundException(
-                            "Menaxheri me ID " + p.id() + " nuk ekziston."
-                    ));
-            k.setMenaxheri(m);
-        } else {
-            puntori pu = puntoriRepository.findById(p.id())
-                    .orElseThrow(() -> new ResourceNotFoundException(
-                            "Puntori me ID " + p.id() + " nuk ekziston."
-                    ));
-            k.setPuntori(pu);
-        }
 
         k = kerkesaRepository.saveAndFlush(k);
 
         // Read data_krijimit (database default)
         entityManager.refresh(k);
 
-        njoftoMenaxheretPerKerkeseTeRe(k, p);
+        njoftoMenaxherin(k);
 
         return toResponse(k);
     }
 
-    @Transactional(readOnly = true)
-    public List<KerkesaResponse> listo(Perdoruesi p, String statusi) {
-
-        String filtri = statusi == null || statusi.isBlank()
-                ? null
-                : validoStatusin(statusi);
-
-        List<Kerkesa> kerkesat;
-
-        if (p.eshteMenaxher()) {
-            kerkesat = filtri == null
-                    ? kerkesaRepository.findAll(RENDITJA)
-                    : kerkesaRepository.findByStatusi(filtri, RENDITJA);
-        } else {
-            kerkesat = filtri == null
-                    ? kerkesaRepository.findByPuntori_Id(p.id(), RENDITJA)
-                    : kerkesaRepository.findByPuntori_IdAndStatusi(p.id(), filtri, RENDITJA);
-        }
-
-        return kerkesat.stream().map(this::toResponse).toList();
-    }
-
-    @Transactional(readOnly = true)
-    public KerkesaResponse merr(Perdoruesi p, Long id) {
-        return toResponse(gjej(p, id));
-    }
-
+    /** Worker edits their own waiting request, optionally sending it to another manager. */
     @Transactional
-    public KerkesaResponse perditeso(Perdoruesi p, Long id, PerditesoKerkesenRequest request) {
+    public KerkesaResponse perditeso(Long idPuntorit, Long id, PerditesoKerkesenRequest request) {
 
-        Kerkesa k = gjej(p, id);
-
-        // Only the creator edits the content, and only while it is waiting
-        if (!eshteKrijuesi(p, k)) {
-            throw new AccessDeniedException(
-                    "Mund te ndryshoni vetem kerkesat tuaja."
-            );
-        }
+        Kerkesa k = gjejTePuntorit(idPuntorit, id);
 
         if (!NE_PRITJE.equals(k.getStatusi())) {
             throw new IllegalArgumentException(
@@ -153,19 +128,91 @@ public class KerkesaService {
             k.setTitulli(teksti(request.titulli(), "Titulli", 255));
         }
 
+        // Not sent = unchanged; sent as "" = removed
         if (request.pershkrimi() != null) {
-            k.setPershkrimi(teksti(request.pershkrimi(), "Pershkrimi", null));
+            k.setPershkrimi(opsional(request.pershkrimi()));
+        }
+
+        boolean menaxherITjeter = request.idMenaxherit() != null
+                && (k.getMenaxheri() == null
+                    || !request.idMenaxherit().equals(k.getMenaxheri().getId()));
+
+        if (menaxherITjeter) {
+            k.setMenaxheri(gjejMenaxherin(request.idMenaxherit()));
         }
 
         kerkesaRepository.flush();
 
+        // The new manager has not seen this request yet
+        if (menaxherITjeter) {
+            njoftoMenaxherin(k);
+        }
+
         return toResponse(k);
     }
 
+    /** Worker deletes their own request while it is still waiting. */
     @Transactional
-    public KerkesaResponse aprovo(Perdoruesi p, Long id, AprovoKerkesenRequest request) {
+    public void fshi(Long idPuntorit, Long id) {
 
-        Kerkesa k = gjejPerVendim(p, id);
+        Kerkesa k = gjejTePuntorit(idPuntorit, id);
+
+        if (!NE_PRITJE.equals(k.getStatusi())) {
+            throw new IllegalArgumentException(
+                    "Kerkesa nuk mund te fshihet pasi eshte aprovuar ose refuzuar."
+            );
+        }
+
+        kerkesaRepository.delete(k);
+    }
+
+    /** Managers a worker can send a request to. */
+    @Transactional(readOnly = true)
+    public List<KerkesaResponse.Personi> menaxheretPerZgjedhje() {
+        return menaxheriRepository.findAll()
+                .stream()
+                .map(m -> new KerkesaResponse.Personi(m.getId(), m.getEmri(), m.getMbiemri()))
+                .toList();
+    }
+
+    // ---------- worker + manager ----------
+
+    /** Worker: own requests. Manager: requests sent to them. */
+    @Transactional(readOnly = true)
+    public List<KerkesaResponse> listo(Perdoruesi p, String statusi) {
+
+        String filtri = statusi == null || statusi.isBlank()
+                ? null
+                : validoStatusin(statusi);
+
+        List<Kerkesa> kerkesat;
+
+        if (p.eshteMenaxher()) {
+            kerkesat = filtri == null
+                    ? kerkesaRepository.findByMenaxheri_Id(p.id(), RENDITJA)
+                    : kerkesaRepository.findByMenaxheri_IdAndStatusi(p.id(), filtri, RENDITJA);
+        } else {
+            kerkesat = filtri == null
+                    ? kerkesaRepository.findByPuntori_Id(p.id(), RENDITJA)
+                    : kerkesaRepository.findByPuntori_IdAndStatusi(p.id(), filtri, RENDITJA);
+        }
+
+        return kerkesat.stream().map(this::toResponse).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public KerkesaResponse merr(Perdoruesi p, Long id) {
+        return toResponse(p.eshteMenaxher()
+                ? gjejTeMenaxherit(p.id(), id)
+                : gjejTePuntorit(p.id(), id));
+    }
+
+    // ---------- manager ----------
+
+    @Transactional
+    public KerkesaResponse aprovo(Long idMenaxherit, Long id, AprovoKerkesenRequest request) {
+
+        Kerkesa k = gjejPerVendim(idMenaxherit, id);
 
         k.setStatusi(E_APROVUAR);
         k.setPershkrimiAprovimit(
@@ -174,7 +221,7 @@ public class KerkesaService {
 
         KerkesaResponse response = ruajVendimin(k);
 
-        njoftoKrijuesin(
+        njoftoPuntorin(
                 k,
                 "kerkesa_e_aprovuar",
                 "Kerkesa juaj u aprovua",
@@ -186,9 +233,9 @@ public class KerkesaService {
     }
 
     @Transactional
-    public KerkesaResponse refuzo(Perdoruesi p, Long id, RefuzoKerkesenRequest request) {
+    public KerkesaResponse refuzo(Long idMenaxherit, Long id, RefuzoKerkesenRequest request) {
 
-        Kerkesa k = gjejPerVendim(p, id);
+        Kerkesa k = gjejPerVendim(idMenaxherit, id);
 
         k.setStatusi(E_REFUZUAR);
         k.setPershkrimiAnulimit(
@@ -197,7 +244,7 @@ public class KerkesaService {
 
         KerkesaResponse response = ruajVendimin(k);
 
-        njoftoKrijuesin(
+        njoftoPuntorin(
                 k,
                 "kerkesa_e_refuzuar",
                 "Kerkesa juaj u refuzua",
@@ -208,115 +255,85 @@ public class KerkesaService {
         return response;
     }
 
-    @Transactional
-    public void fshi(Perdoruesi p, Long id) {
-
-        Kerkesa k = gjej(p, id);
-
-        // Managers can delete any request of the tenant.
-        // Workers can delete only their own requests that are still waiting.
-        if (!p.eshteMenaxher() && !NE_PRITJE.equals(k.getStatusi())) {
-            throw new IllegalArgumentException(
-                    "Kerkesa nuk mund te fshihet pasi eshte aprovuar ose refuzuar."
-            );
-        }
-
-        kerkesaRepository.delete(k);
-    }
-
     // ---------- notifications ----------
     // NotificationService sends after commit; a notification problem never
     // fails or rolls back the request action.
 
-    /** New request: every manager except the creator. */
-    private void njoftoMenaxheretPerKerkeseTeRe(Kerkesa k, Perdoruesi krijuesi) {
+    /** New (or re-sent) request: only the chosen manager. */
+    private void njoftoMenaxherin(Kerkesa k) {
         try {
-            List<Marresi> menaxheret = menaxheriRepository.findAllIds()
-                    .stream()
-                    .filter(id -> !(krijuesi.eshteMenaxher() && id.equals(krijuesi.id())))
-                    .map(Marresi::menaxher)
-                    .toList();
-
-            if (menaxheret.isEmpty()) {
-                return;
-            }
-
-            String emri = k.getPuntori() != null
-                    ? k.getPuntori().getEmri() + " " + k.getPuntori().getMbiemri()
-                    : k.getMenaxheri().getEmri() + " " + k.getMenaxheri().getMbiemri();
+            String emri = k.getPuntori().getEmri() + " " + k.getPuntori().getMbiemri();
 
             notificationService.dergo(
-                    menaxheret,
+                    List.of(Marresi.menaxher(k.getMenaxheri().getId())),
                     "Kerkese e re",
-                    shkurto(emri + " dergoi kerkesen '" + k.getTitulli() + "'.", MAX_MESAZHI),
+                    shkurto(emri + " ju dergoi kerkesen '" + k.getTitulli() + "'."),
                     Map.of(
                             "tipi", "kerkesa_e_re",
                             "idKerkeses", k.getId()
                     )
             );
         } catch (Exception e) {
-            log.warn("Could not notify managers about request {}: {}", k.getId(), e.getMessage());
+            log.warn("Could not notify manager about request {}: {}", k.getId(), e.getMessage());
         }
     }
 
-    /** Decision: the creator of the request, with the optional note appended. */
-    private void njoftoKrijuesin(
+    /** Decision: the worker who created the request, with the optional note appended. */
+    private void njoftoPuntorin(
             Kerkesa k,
             String tipi,
             String titulli,
             String mesazhi,
             String shenimi
     ) {
-        try {
-            Marresi marresi = k.getPuntori() != null
-                    ? Marresi.puntor(k.getPuntori().getId())
-                    : Marresi.menaxher(k.getMenaxheri().getId());
+        if (k.getPuntori() == null) {
+            return;
+        }
 
+        try {
             String teksti = shenimi == null ? mesazhi : mesazhi + " " + shenimi;
 
             notificationService.dergo(
-                    List.of(marresi),
+                    List.of(Marresi.puntor(k.getPuntori().getId())),
                     titulli,
-                    shkurto(teksti, MAX_MESAZHI),
+                    shkurto(teksti),
                     Map.of(
                             "tipi", tipi,
                             "idKerkeses", k.getId()
                     )
             );
         } catch (Exception e) {
-            log.warn("Could not notify creator of request {}: {}", k.getId(), e.getMessage());
+            log.warn("Could not notify worker about request {}: {}", k.getId(), e.getMessage());
         }
     }
 
-    // Notification body limit (njoftimet.mesazhi)
-    private static final int MAX_MESAZHI = 500;
-
-    private String shkurto(String teksti, int max) {
-        return teksti.length() > max ? teksti.substring(0, max - 3) + "..." : teksti;
+    private String shkurto(String teksti) {
+        return teksti.length() > MAX_MESAZHI
+                ? teksti.substring(0, MAX_MESAZHI - 3) + "..."
+                : teksti;
     }
 
     // ---------- helpers ----------
+    // Someone else's request is reported as "not found", never as "forbidden".
 
-    /** A worker asking for someone else's request gets "not found", never "forbidden". */
-    private Kerkesa gjej(Perdoruesi p, Long id) {
-        return (p.eshteMenaxher()
-                ? kerkesaRepository.findById(id)
-                : kerkesaRepository.findByIdAndPuntori_Id(id, p.id()))
+    private Kerkesa gjejTePuntorit(Long idPuntorit, Long id) {
+        return kerkesaRepository.findByIdAndPuntori_Id(id, idPuntorit)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Kerkesa me ID " + id + " nuk ekziston."
                 ));
     }
 
-    /** Only waiting requests can be decided, and a manager cannot decide their own. */
-    private Kerkesa gjejPerVendim(Perdoruesi p, Long id) {
+    private Kerkesa gjejTeMenaxherit(Long idMenaxherit, Long id) {
+        return kerkesaRepository.findByIdAndMenaxheri_Id(id, idMenaxherit)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Kerkesa me ID " + id + " nuk ekziston."
+                ));
+    }
 
-        Kerkesa k = gjej(p, id);
+    /** Only waiting requests sent to this manager can be decided. */
+    private Kerkesa gjejPerVendim(Long idMenaxherit, Long id) {
 
-        if (eshteKrijuesi(p, k)) {
-            throw new AccessDeniedException(
-                    "Nuk mund te aprovoni ose refuzoni kerkesen tuaj."
-            );
-        }
+        Kerkesa k = gjejTeMenaxherit(idMenaxherit, id);
 
         if (!NE_PRITJE.equals(k.getStatusi())) {
             throw new IllegalArgumentException(
@@ -327,18 +344,18 @@ public class KerkesaService {
         return k;
     }
 
+    private menaxheri gjejMenaxherin(Long idMenaxherit) {
+        return menaxheriRepository.findById(idMenaxherit)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Menaxheri me ID " + idMenaxherit + " nuk ekziston."
+                ));
+    }
+
     /** Saves the decision, then reloads so the trigger's date is in the response. */
     private KerkesaResponse ruajVendimin(Kerkesa k) {
         kerkesaRepository.saveAndFlush(k);
         entityManager.refresh(k);
         return toResponse(k);
-    }
-
-    private boolean eshteKrijuesi(Perdoruesi p, Kerkesa k) {
-        // getId() on a lazy proxy does not hit the database
-        return p.eshteMenaxher()
-                ? k.getMenaxheri() != null && k.getMenaxheri().getId().equals(p.id())
-                : k.getPuntori() != null && k.getPuntori().getId().equals(p.id());
     }
 
     private String validoStatusin(String statusi) {
@@ -377,23 +394,21 @@ public class KerkesaService {
 
     private KerkesaResponse toResponse(Kerkesa k) {
 
-        KerkesaResponse.Krijuesi krijuesi = null;
+        KerkesaResponse.Personi puntori = k.getPuntori() == null
+                ? null
+                : new KerkesaResponse.Personi(
+                        k.getPuntori().getId(),
+                        k.getPuntori().getEmri(),
+                        k.getPuntori().getMbiemri()
+                );
 
-        if (k.getPuntori() != null) {
-            krijuesi = new KerkesaResponse.Krijuesi(
-                    k.getPuntori().getId(),
-                    k.getPuntori().getEmri(),
-                    k.getPuntori().getMbiemri(),
-                    "PUNTOR"
-            );
-        } else if (k.getMenaxheri() != null) {
-            krijuesi = new KerkesaResponse.Krijuesi(
-                    k.getMenaxheri().getId(),
-                    k.getMenaxheri().getEmri(),
-                    k.getMenaxheri().getMbiemri(),
-                    "MENAXHER"
-            );
-        }
+        KerkesaResponse.Personi menaxheri = k.getMenaxheri() == null
+                ? null
+                : new KerkesaResponse.Personi(
+                        k.getMenaxheri().getId(),
+                        k.getMenaxheri().getEmri(),
+                        k.getMenaxheri().getMbiemri()
+                );
 
         return new KerkesaResponse(
                 k.getId(),
@@ -405,7 +420,8 @@ public class KerkesaService {
                 k.getDataRefuzimit(),
                 k.getPershkrimiAprovimit(),
                 k.getPershkrimiAnulimit(),
-                krijuesi
+                puntori,
+                menaxheri
         );
     }
 }
